@@ -19,7 +19,7 @@ export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024; // 25 MB
 
 /** Extensions we let the user pick from the chat input. */
 export const ACCEPTED_ATTACHMENT_EXT =
-  ".csv,.tsv,.txt,.json,.md,.parquet,.xlsx";
+  ".csv,.tsv,.txt,.json,.md,.parquet,.xlsx,.pdf,.png,.jpg,.jpeg,.gif,.webp,.mp3,.m4a,.ogg,.wav,.webm,.opus,.aac,.flac";
 
 const EXT_MIME: Record<string, string> = {
   csv: "text/csv",
@@ -29,6 +29,20 @@ const EXT_MIME: Record<string, string> = {
   md: "text/markdown",
   parquet: "application/vnd.apache.parquet",
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  ogg: "audio/ogg",
+  wav: "audio/wav",
+  webm: "audio/webm",
+  opus: "audio/opus",
+  aac: "audio/aac",
+  flac: "audio/flac",
 };
 
 /** Best-effort MIME: trust the browser, fall back to the extension, default csv. */
