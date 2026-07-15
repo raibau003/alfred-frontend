@@ -5,6 +5,7 @@ import { Paperclip, Play, FileText } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatMessage } from "@/stores/workspaceStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { stripWorkflowContext, parseWorkflowRun } from "@/lib/workflow/sync";
 import { formatBytes } from "@/lib/opencode/attachments";
 
@@ -14,21 +15,37 @@ interface Props {
 
 export function MessageList({ messages }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const busy = useWorkspaceStore((s) => s.busy);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, messages[messages.length - 1]?.parts]);
+  }, [messages.length, messages[messages.length - 1]?.parts, busy]);
+
+  // Check if the last assistant message has only tool parts (no text yet)
+  const lastMsg = messages[messages.length - 1];
+  const showTyping = busy && (!lastMsg || lastMsg.role === "user" ||
+    (lastMsg.role === "assistant" && lastMsg.parts.every((p) => p.type === "tool" || (p.type === "text" && !p.text.trim()))));
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
       {messages.length === 0 && (
         <div className="text-center text-sm text-slate-400 mt-12">
-          Empezá la conversación.
+          Escribe un mensaje para hablar con Alfred.
         </div>
       )}
       {messages.map((m) => (
         <MessageBubble key={m.id} message={m} />
       ))}
+      {showTyping && (
+        <div className="flex justify-start">
+          <div className="rounded-lg px-4 py-3 bg-surface-2 border border-surface-4 flex items-center gap-1.5">
+            <span className="inline-block w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+            <span className="inline-block w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+            <span className="inline-block w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+            <span className="ml-2 text-xs text-slate-400">Alfred está pensando...</span>
+          </div>
+        </div>
+      )}
       <div ref={bottomRef} />
     </div>
   );
@@ -43,7 +60,8 @@ export function MessageList({ messages }: Props) {
  */
 function hasRenderableContent(message: ChatMessage): boolean {
   return message.parts.some((p) => {
-    if (p.type === "tool") return true;
+    // Tool calls are hidden in the UI (only errors show), so don't count them
+    if (p.type === "tool") return p.isError === true;
     if (p.type === "file") return true;
     if (p.type === "text") {
       const stripped = stripWorkflowContext(p.text);
@@ -173,34 +191,20 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             );
           }
           if (p.type === "tool") {
-            const failed = p.isError === true;
-            return (
-              <div
-                key={p.id}
-                className={`font-mono text-xs rounded px-2 py-1 mt-1 border ${
-                  failed
-                    ? "bg-red-50 border-red-300 text-red-800"
-                    : "bg-surface-3 border-surface-4"
-                }`}
-              >
-                <span className={failed ? "text-red-500" : "text-slate-500"}>
-                  {failed ? "tool error:" : "tool:"}
-                </span>{" "}
-                <span className="font-semibold">{p.toolName}</span>
-                {p.args && Object.keys(p.args as object).length > 0 ? (
-                  <pre className="mt-1 text-[10px] overflow-x-auto">
-                    {String(JSON.stringify(p.args, null, 2))}
-                  </pre>
-                ) : null}
-                {failed && p.result != null ? (
-                  <pre className="mt-1 text-[10px] overflow-x-auto whitespace-pre-wrap text-red-700">
-                    {typeof p.result === "string"
-                      ? p.result
-                      : String(JSON.stringify(p.result, null, 2))}
-                  </pre>
-                ) : null}
-              </div>
-            );
+            // Only show errors, hide normal tool calls
+            if (p.isError === true) {
+              return (
+                <div
+                  key={p.id}
+                  className="font-mono text-xs rounded px-2 py-1 mt-1 border bg-red-50 border-red-300 text-red-800"
+                >
+                  <span className="text-red-500">Error:</span>{" "}
+                  <span>{typeof p.result === "string" ? p.result : String(p.toolName)}</span>
+                </div>
+              );
+            }
+            // Hide non-error tool calls completely
+            return null;
           }
           return null;
         })}
