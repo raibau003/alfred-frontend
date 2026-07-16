@@ -8,8 +8,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Merlina Sandbox",
-  description: "AI Agent management platform on GKE Autopilot",
+  title: "Alfred Agent",
+  description: "Administrador de vida integral",
 };
 
 export default function RootLayout({
