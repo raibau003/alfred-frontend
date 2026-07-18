@@ -29,16 +29,35 @@ export function attachWorkflowContext(text: string, workflow: Workflow): string 
   return `${TAG_OPEN}\n${JSON.stringify(snapshot, null, 2)}\n${TAG_CLOSE}\n\n${text}`;
 }
 
-/** Strip the workflow context block before rendering the message to the user. */
+// Patterns for OpenCode internal reasoning that should not be shown to users
+const INTERNAL_PATTERNS = [
+  /^Objective\n[\s\S]*?(?=\n[A-Z]|$)/m, // "Objective\n..."
+  /^Important Details\n[\s\S]*?(?=\n[A-Z]|$)/m,
+  /^Work State\n[\s\S]*?(?=\n[A-Z]|$)/m,
+  /^(?:Completed|Active|Blocked)\n[\s\S]*?(?=\n[A-Z]|$)/m,
+  /^Next Move\n[\s\S]*?(?=\n[A-Z]|$)/m,
+  /^Relevant Files\n[\s\S]*?(?=\n[A-Z]|$)/m,
+  /Continue if you have next steps.*$/m,
+  /^Continue if you have next steps[\s\S]*/m,
+];
+
+/** Strip workflow context AND OpenCode internal reasoning blocks. */
 export function stripWorkflowContext(text: string): {
   cleanText: string;
   hadContext: boolean;
 } {
-  if (!text.includes(TAG_OPEN)) return { cleanText: text, hadContext: false };
-  return {
-    cleanText: text.replace(BLOCK_RE, "").trimStart(),
-    hadContext: true,
-  };
+  const hadContext = text.includes(TAG_OPEN);
+  let clean = text.replace(BLOCK_RE, "").trimStart();
+
+  // Strip OpenCode internal reasoning blocks
+  for (const pat of INTERNAL_PATTERNS) {
+    clean = clean.replace(pat, "");
+  }
+
+  // Remove residual empty lines and trim
+  clean = clean.replace(/\n{3,}/g, "\n\n").trim();
+
+  return { cleanText: clean, hadContext };
 }
 
 /** Build a workflow-run prompt with a header tag the UI can collapse. */
