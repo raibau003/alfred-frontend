@@ -30,12 +30,11 @@ export function LoginForm() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50">
       <div className="w-full max-w-sm space-y-6 rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="flex flex-col items-center gap-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600">
-            <Zap className="h-6 w-6 text-white" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex h-16 w-40 items-center justify-center rounded-xl bg-[#0a1628] px-4 py-2">
+            <img src="/alfred-logo-dark.png" alt="Alfred" className="h-10" />
           </div>
-          <h1 className="text-xl font-bold text-slate-900">Alfred</h1>
-          <p className="text-sm text-slate-500">Tu asistente personal con IA</p>
+          <p className="text-sm text-slate-500">Tu agente personal de IA</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
