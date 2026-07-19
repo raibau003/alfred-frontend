@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bot, Zap, Mail, ShoppingCart, Heart, Briefcase, Home, GraduationCap } from "lucide-react";
+import Link from "next/link";
+import { Bot, Zap, Mail, ShoppingCart, Heart, Briefcase, Home, GraduationCap, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Agent } from "@/lib/supabase/types";
 
@@ -41,11 +42,20 @@ export default function AgentsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900">Agentes</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          {agents.filter((a) => a.enabled).length} activos de {agents.length} agentes
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">Agentes</h1>
+          <p className="mt-1 text-sm text-slate-400">
+            {agents.filter((a) => a.enabled).length} activos de {agents.length} agentes
+          </p>
+        </div>
+        <Link
+          href="/agents/new"
+          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          Crear agente
+        </Link>
       </div>
 
       {/* Category filters */}
