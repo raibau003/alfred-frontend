@@ -102,8 +102,8 @@ export function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r border-surface-4 bg-surface-1">
       {/* Logo */}
-      <div className="flex h-14 items-center justify-center border-b border-surface-4 px-5">
-        <img src="/alfred-logo.png" alt="Alfred" className="h-8" />
+      <div className="flex h-14 items-center justify-center border-b border-surface-4 px-5 bg-[#0a1628]">
+        <img src="/alfred-logo-dark.png" alt="Alfred" className="h-8 object-contain" />
       </div>
 
       {/* Nav */}
