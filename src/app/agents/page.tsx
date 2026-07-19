@@ -25,6 +25,7 @@ export default function AgentsPage() {
     supabase
       .from("agents")
       .select("*")
+      .neq("internal", true)
       .order("category")
       .then(({ data }) => {
         if (data) setAgents(data);
@@ -37,8 +38,10 @@ export default function AgentsPage() {
     setAgents((prev) => prev.map((a) => (a.id === id ? { ...a, enabled } : a)));
   };
 
-  const categories = [...new Set(agents.map((a) => a.category).filter(Boolean))];
-  const filtered = filter ? agents.filter((a) => a.category === filter) : agents;
+  // Hide internal agents (auditor, mcp-factory, scheduler)
+  const publicAgents = agents.filter((a) => !(a.config as any)?.internal && !(a as any).internal);
+  const categories = [...new Set(publicAgents.map((a) => a.category).filter(Boolean))];
+  const filtered = filter ? publicAgents.filter((a) => a.category === filter) : publicAgents;
 
   return (
     <div className="space-y-6">
@@ -89,9 +92,10 @@ export default function AgentsPage() {
         {filtered.map((agent) => {
           const cfg = categoryConfig[agent.category ?? ""] ?? { label: "", color: "", icon: Bot };
           return (
-            <div
+            <Link
+              href={`/agents/${agent.id}`}
               key={agent.id}
-              className={`rounded-xl border p-4 transition-all ${
+              className={`block rounded-xl border p-4 transition-all ${
                 agent.enabled
                   ? "border-slate-200 bg-white hover:shadow-md"
                   : "border-slate-100 bg-slate-50 opacity-60"
@@ -133,7 +137,7 @@ export default function AgentsPage() {
                 <span className="font-mono">{agent.id}</span>
                 {agent.is_custom && <span className="rounded bg-yellow-50 px-1.5 py-0.5 text-yellow-600 border border-yellow-200">Custom</span>}
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>
