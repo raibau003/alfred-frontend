@@ -4,22 +4,25 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Bot,
-  Package,
-  ScrollText,
-  Server,
+  MessageSquare,
+  Plug,
+  Settings,
+  LogOut,
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 const navItems = [
+  { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/agents", label: "Agents", icon: Bot },
-  { href: "/playbooks", label: "Playbooks", icon: Package },
-  { href: "/roles", label: "Roles", icon: ScrollText },
+  { href: "/agents", label: "Agentes", icon: Bot },
+  { href: "/connectors", label: "Conectores", icon: Plug },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { user, signOut } = useAuth();
 
   return (
     <aside className="fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r border-surface-4 bg-surface-1">
@@ -62,14 +65,20 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-surface-4 p-4">
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <Server className="h-3.5 w-3.5" />
-          <span className="font-mono">GKE Autopilot</span>
+      <div className="border-t border-surface-4 p-4 space-y-2">
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold">
+            {user?.email?.[0]?.toUpperCase() ?? "U"}
+          </div>
+          <span className="truncate">{user?.email ?? "Usuario"}</span>
         </div>
-        <p className="mt-1 font-mono text-[10px] text-slate-400">
-          us-central1
-        </p>
+        <button
+          onClick={() => signOut()}
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-slate-400 hover:bg-surface-3 hover:text-red-500 transition-colors"
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          Cerrar sesion
+        </button>
       </div>
     </aside>
   );

@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AppShell } from "@/components/layout/AppShell";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/components/auth/AuthProvider";
+import { AuthGate } from "@/components/auth/AuthGate";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Alfred Agent",
-  description: "Administrador de vida integral",
+  title: "Alfred",
+  description: "Tu asistente personal con IA",
 };
 
 export default function RootLayout({
@@ -20,15 +21,17 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} antialiased`}>
-        <TooltipProvider>
-          <AppShell>{children}</AppShell>
-        </TooltipProvider>
-        <Toaster
-          position="bottom-right"
-          theme="dark"
-          richColors
-          closeButton
-        />
+        <AuthProvider>
+          <TooltipProvider>
+            <AuthGate>{children}</AuthGate>
+          </TooltipProvider>
+          <Toaster
+            position="bottom-right"
+            theme="dark"
+            richColors
+            closeButton
+          />
+        </AuthProvider>
       </body>
     </html>
   );
