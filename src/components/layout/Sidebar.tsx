@@ -13,8 +13,11 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/AuthProvider";
 
+import { ShoppingCart } from "lucide-react";
+
 const navItems = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
+  { href: "/shopping", label: "Compras", icon: ShoppingCart },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/agents", label: "Agentes", icon: Bot },
   { href: "/connectors", label: "Conectores", icon: Plug },
