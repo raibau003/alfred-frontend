@@ -1,246 +1,194 @@
 "use client";
-import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import {
-  ArrowLeft,
-  ExternalLink,
-  Trash2,
-  Package,
-  CheckCircle2,
-  XCircle,
-  UserCog,
-  LayoutPanelLeft,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { AgentStatusBadge } from "@/components/agents/AgentStatusBadge";
-import { DeleteAgentDialog } from "@/components/agents/DeleteAgentDialog";
-import { InstallPlaybooksDialog } from "@/components/agents/InstallPlaybooksDialog";
-import { ChangeRoleDialog } from "@/components/agents/ChangeRoleDialog";
-import { useAgent } from "@/hooks/useAgent";
-import { useAgentHealth } from "@/hooks/useAgentHealth";
-import { usePlaybooks } from "@/hooks/usePlaybooks";
-import { useRoles } from "@/hooks/useRoles";
-import { agentUrl, formatDate } from "@/lib/utils";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { Bot, Plug, Package, Plus, Trash2, Search } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/components/auth/AuthProvider";
+import type { Agent, Connector } from "@/lib/supabase/types";
+
+interface AgentMcp {
+  id: string;
+  agent_id: string;
+  mcp_name: string;
+  mcp_package: string;
+  description: string | null;
+  enabled: boolean;
+}
 
 export default function AgentDetailPage() {
-  const params = useParams();
-  const router = useRouter();
-  const id = params.id as string;
+  const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const [agent, setAgent] = useState<Agent | null>(null);
+  const [mcps, setMcps] = useState<AgentMcp[]>([]);
+  const [connectors, setConnectors] = useState<Connector[]>([]);
+  const [showAddMcp, setShowAddMcp] = useState(false);
+  const [newMcp, setNewMcp] = useState({ name: "", package_name: "", description: "" });
 
-  const { agent, isLoading } = useAgent(id);
-  const { health } = useAgentHealth(id);
-  const { playbooks } = usePlaybooks();
-  const { roles } = useRoles();
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.from("agents").select("*").eq("id", id).single().then(({ data }) => {
+      if (data) setAgent(data);
+    });
+    supabase.from("agent_mcps").select("*").eq("agent_id", id).then(({ data }) => {
+      if (data) setMcps(data as AgentMcp[]);
+    });
+    if (user) {
+      supabase.from("connectors").select("*").eq("agent_id", id).eq("user_id", user.id).then(({ data }) => {
+        if (data) setConnectors(data as Connector[]);
+      });
+    }
+  }, [id, user]);
 
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [installOpen, setInstallOpen] = useState(false);
-  const [changeRoleOpen, setChangeRoleOpen] = useState(false);
+  const toggleMcp = async (mcpId: string, enabled: boolean) => {
+    const supabase = createClient();
+    await supabase.from("agent_mcps").update({ enabled }).eq("id", mcpId);
+    setMcps(prev => prev.map(m => m.id === mcpId ? { ...m, enabled } : m));
+  };
 
-  const roleName = agent?.role_id
-    ? roles.find((r) => r.id === agent.role_id)?.name ?? agent.role_id
-    : null;
-  const playbookName = agent?.playbook_id
-    ? playbooks.find((p) => p.id === agent.playbook_id)?.name ?? agent.playbook_id
-    : null;
-  const podUrl = agent?.url || agentUrl(id);
+  const addMcp = async () => {
+    if (!newMcp.name || !newMcp.package_name) return;
+    const supabase = createClient();
+    const { data } = await supabase.from("agent_mcps").insert({
+      agent_id: id,
+      mcp_name: newMcp.name,
+      mcp_package: newMcp.package_name,
+      description: newMcp.description || null,
+      enabled: true,
+      installed_by: user?.id,
+    }).select().single();
+    if (data) {
+      setMcps(prev => [...prev, data as AgentMcp]);
+      setNewMcp({ name: "", package_name: "", description: "" });
+      setShowAddMcp(false);
+    }
+  };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-48 bg-surface-3" />
-        <Skeleton className="h-32 w-full bg-surface-3" />
-        <Skeleton className="h-48 w-full bg-surface-3" />
-      </div>
-    );
-  }
+  const removeMcp = async (mcpId: string) => {
+    const supabase = createClient();
+    await supabase.from("agent_mcps").delete().eq("id", mcpId);
+    setMcps(prev => prev.filter(m => m.id !== mcpId));
+  };
 
-  if (!agent) {
-    return (
-      <div className="rounded-lg border border-surface-4 bg-surface-2 py-20 text-center">
-        <p className="text-slate-400">Agent not found</p>
-        <Link href="/agents" className="mt-4 inline-block text-sm text-brand-600 hover:underline">
-          ← Back to agents
-        </Link>
-      </div>
-    );
-  }
+  if (!agent) return <div className="p-8 text-slate-400">Cargando...</div>;
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-3xl space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <Link
-            href="/agents"
-            className="mb-3 flex items-center gap-1 text-xs text-slate-400 hover:text-slate-900"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Agents
-          </Link>
-          <div className="flex items-center gap-3">
-            <h1 className="font-mono text-xl font-semibold text-slate-900">{agent.name}</h1>
-            <AgentStatusBadge status={agent.status} size="lg" />
-          </div>
-          <p className="mt-1 font-mono text-xs text-slate-400">{id}</p>
+      <div className="flex items-center gap-4">
+        <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-blue-50">
+          <Bot className="h-7 w-7 text-blue-600" />
         </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/workspace/${id}`}
-            className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
-          >
-            <LayoutPanelLeft className="h-4 w-4" />
-            Open Workspace
-          </Link>
-          <a
-            href={podUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-surface-3 transition-colors"
-          >
-            <ExternalLink className="h-4 w-4" />
-            UI nativa
-          </a>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setInstallOpen(true)}
-            className="gap-2 text-slate-500 hover:text-slate-900"
-          >
-            <Package className="h-4 w-4" />
-            Playbooks
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setChangeRoleOpen(true)}
-            disabled={agent.status === "restarting"}
-            className="gap-2 text-slate-500 hover:text-slate-900"
-          >
-            <UserCog className="h-4 w-4" />
-            Change Role
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setDeleteOpen(true)}
-            className="gap-2 text-red-600 hover:text-red-600"
-          >
-            <Trash2 className="h-4 w-4" />
-            Delete
-          </Button>
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">{agent.name}</h1>
+          <p className="text-sm text-slate-400">{agent.description}</p>
+          <div className="mt-1 flex items-center gap-2">
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">{agent.id}</span>
+            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600">{agent.category}</span>
+            {agent.is_custom && <span className="rounded-full bg-yellow-50 px-2 py-0.5 text-[10px] font-medium text-yellow-600">Custom</span>}
+          </div>
         </div>
       </div>
 
-      {/* Health */}
-      {health && (
-        <div className="rounded-lg border border-surface-4 bg-surface-2 p-5">
-          <h2 className="mb-4 text-sm font-medium text-slate-500 uppercase tracking-wider">Health</h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <HealthIndicator
-              label="Overall"
-              ok={health.ready}
-              value={health.ready ? "Healthy" : "Unhealthy"}
+      {/* MCPs */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <Package className="h-4 w-4 text-purple-600" />
+            MCPs ({mcps.length})
+          </h2>
+          <button
+            onClick={() => setShowAddMcp(true)}
+            className="flex items-center gap-1 rounded-md bg-purple-600 px-3 py-1.5 text-xs text-white hover:bg-purple-700"
+          >
+            <Plus className="h-3 w-3" />
+            Agregar MCP
+          </button>
+        </div>
+
+        {showAddMcp && (
+          <div className="rounded-lg border border-purple-200 bg-purple-50 p-4 space-y-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Search className="h-4 w-4 text-purple-500" />
+              <span className="text-xs font-medium text-purple-900">Agregar MCP al agente</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                value={newMcp.name}
+                onChange={(e) => setNewMcp({ ...newMcp, name: e.target.value })}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs"
+                placeholder="Nombre (ej: Google Flights)"
+              />
+              <input
+                value={newMcp.package_name}
+                onChange={(e) => setNewMcp({ ...newMcp, package_name: e.target.value })}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs"
+                placeholder="Paquete (ej: fli, @playwright/mcp)"
+              />
+            </div>
+            <input
+              value={newMcp.description}
+              onChange={(e) => setNewMcp({ ...newMcp, description: e.target.value })}
+              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs"
+              placeholder="Descripcion..."
             />
-            <HealthIndicator
-              label="Ready Replicas"
-              ok={health.ready_replicas > 0}
-              value={`${health.ready_replicas} replica${health.ready_replicas !== 1 ? "s" : ""}`}
-            />
-            <div className="rounded-md border border-surface-4 bg-surface-3 p-3">
-              <p className="text-xs text-slate-400">Status</p>
-              <AgentStatusBadge status={health.status} />
+            <div className="flex gap-2">
+              <button onClick={addMcp} className="rounded-md bg-purple-600 px-3 py-1 text-xs text-white hover:bg-purple-700">Agregar</button>
+              <button onClick={() => setShowAddMcp(false)} className="rounded-md border border-slate-300 px-3 py-1 text-xs text-slate-600">Cancelar</button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Details */}
-      <div className="rounded-lg border border-surface-4 bg-surface-2 p-5">
-        <h2 className="mb-4 text-sm font-medium text-slate-500 uppercase tracking-wider">Details</h2>
-        <dl className="grid gap-4 sm:grid-cols-2">
-          <DetailRow label="Role" value={roleName ?? "—"} />
-          <DetailRow label="Ready Replicas" value={String(agent.ready_replicas ?? "—")} />
-          <DetailRow
-            label="URL"
-            value={
-              <a
-                href={podUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="font-mono text-brand-600 hover:underline"
-              >
-                {podUrl}
-              </a>
-            }
-          />
-          <DetailRow
-            label="Playbook"
-            value={playbookName ?? "None"}
-          />
-        </dl>
-      </div>
-
-      <DeleteAgentDialog
-        agentId={id}
-        open={deleteOpen}
-        onOpenChange={setDeleteOpen}
-        onDeleted={() => router.push("/agents")}
-      />
-      <InstallPlaybooksDialog
-        agentId={id}
-        currentPlaybookId={agent.playbook_id}
-        availablePlaybooks={playbooks}
-        open={installOpen}
-        onOpenChange={setInstallOpen}
-      />
-      <ChangeRoleDialog
-        agentId={id}
-        currentRoleId={agent.role_id}
-        availableRoles={roles}
-        open={changeRoleOpen}
-        onOpenChange={setChangeRoleOpen}
-      />
-    </div>
-  );
-}
-
-function HealthIndicator({
-  label,
-  ok,
-  value,
-}: {
-  label: string;
-  ok: boolean;
-  value: string;
-}) {
-  return (
-    <div className="rounded-md border border-surface-4 bg-surface-3 p-3">
-      <p className="text-xs text-slate-400">{label}</p>
-      <div className="mt-1 flex items-center gap-1.5">
-        {ok ? (
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
-        ) : (
-          <XCircle className="h-4 w-4 text-red-600" />
         )}
-        <span className="text-sm font-medium text-slate-600">{value}</span>
-      </div>
-    </div>
-  );
-}
 
-function DetailRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div>
-      <dt className="text-xs text-slate-400 uppercase tracking-wider">{label}</dt>
-      <dd className="mt-1 text-sm text-slate-600">{value}</dd>
+        <div className="space-y-2">
+          {mcps.map((mcp) => (
+            <div key={mcp.id} className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => toggleMcp(mcp.id, !mcp.enabled)}
+                  className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors ${mcp.enabled ? "bg-purple-600" : "bg-slate-300"}`}
+                >
+                  <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${mcp.enabled ? "translate-x-4" : "translate-x-0.5"}`} />
+                </button>
+                <div>
+                  <p className="text-sm font-medium text-slate-900">{mcp.mcp_name}</p>
+                  <p className="text-[10px] text-slate-400 font-mono">{mcp.mcp_package}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {mcp.description && <p className="text-[10px] text-slate-400 max-w-xs truncate">{mcp.description}</p>}
+                <button onClick={() => removeMcp(mcp.id)} className="text-slate-300 hover:text-red-500">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+          {mcps.length === 0 && <p className="py-3 text-center text-xs text-slate-400">Sin MCPs configurados</p>}
+        </div>
+      </div>
+
+      {/* Connectors */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+        <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+          <Plug className="h-4 w-4 text-green-600" />
+          Conectores ({connectors.length})
+        </h2>
+        <div className="space-y-2">
+          {connectors.map((c) => (
+            <div key={c.id} className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+              <div>
+                <p className="text-sm font-medium text-slate-900">{c.name}</p>
+                <p className="text-[10px] text-slate-400">{c.type} &middot; {c.status}</p>
+              </div>
+              <span className={`inline-block h-2 w-2 rounded-full ${c.status === "connected" ? "bg-green-500" : "bg-slate-300"}`} />
+            </div>
+          ))}
+          {connectors.length === 0 && (
+            <p className="py-3 text-center text-xs text-slate-400">
+              Sin conectores. <a href="/connectors" className="text-blue-600 hover:underline">Configurar</a>
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
