@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Copy, Check, Download, Wifi, WifiOff } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Copy, Check, Download, Wifi, WifiOff, QrCode, RefreshCw, MessageCircle, Send } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import { ROUTER_URL } from "@/lib/alfred/client";
+
+// WAHA public URL (for QR code)
+const WAHA_PUBLIC_URL = "https://waha-production-0b9e.up.railway.app";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -15,6 +18,15 @@ export default function SettingsPage() {
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  // WhatsApp state
+  const [waStatus, setWaStatus] = useState<"connected" | "disconnected" | "qr" | "loading">("loading");
+  const [waQr, setWaQr] = useState<string | null>(null);
+  const [waPhone, setWaPhone] = useState<string | null>(null);
+
+  // Telegram state
+  const [tgBotToken, setTgBotToken] = useState("");
+  const [tgConnected, setTgConnected] = useState(false);
+
   useEffect(() => {
     if (!user) return;
     const supabase = createClient();
@@ -24,14 +36,43 @@ export default function SettingsPage() {
         setPhone(data.phone || "");
       }
     });
-    // Generate deterministic bridge token from user id
     setBridgeToken(`bridge_${user.id.substring(0, 16)}`);
-    // Check bridge status
     fetch(`${ROUTER_URL}/bridge/status`).then(r => r.json()).then(data => {
-      const active = data.bridges?.some((b: { token: string }) => b.token === `bridge_${user.id.substring(0, 8)}`);
+      const active = data.bridges?.some((b: { token: string }) => b.token.startsWith(`bridge_${user.id.substring(0, 8)}`));
       setBridgeActive(!!active);
     }).catch(() => {});
+
+    // Check WhatsApp status
+    checkWhatsAppStatus();
   }, [user]);
+
+  const checkWhatsAppStatus = useCallback(async () => {
+    setWaStatus("loading");
+    try {
+      const resp = await fetch(`${WAHA_PUBLIC_URL}/api/sessions/default`, {
+        headers: { "X-Api-Key": "none" },
+      });
+      const data = await resp.json();
+      if (data.status === "WORKING") {
+        setWaStatus("connected");
+        setWaPhone(data.me?.id?.replace("@c.us", "") || null);
+      } else if (data.status === "SCAN_QR_CODE") {
+        setWaStatus("qr");
+        // Get QR code
+        const qrResp = await fetch(`${WAHA_PUBLIC_URL}/api/sessions/default/auth/qr`, {
+          headers: { "X-Api-Key": "none" },
+        });
+        if (qrResp.ok) {
+          const qrData = await qrResp.json();
+          setWaQr(qrData.value || null);
+        }
+      } else {
+        setWaStatus("disconnected");
+      }
+    } catch {
+      setWaStatus("disconnected");
+    }
+  }, []);
 
   const saveProfile = async () => {
     if (!user) return;
@@ -51,7 +92,7 @@ export default function SettingsPage() {
     <div className="max-w-2xl space-y-8">
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Configuracion</h1>
-        <p className="mt-1 text-sm text-slate-400">Tu perfil y conexiones</p>
+        <p className="mt-1 text-sm text-slate-400">Tu perfil, canales y conexiones</p>
       </div>
 
       {/* Profile */}
@@ -60,139 +101,129 @@ export default function SettingsPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">Nombre</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-            />
+            <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Telefono (WhatsApp)</label>
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              placeholder="+56 9 1234 5678"
-            />
+            <label className="block text-xs font-medium text-slate-700 mb-1">Telefono</label>
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" placeholder="+56 9 1234 5678" />
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={saveProfile}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
+          <button onClick={saveProfile} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
             {saved ? "Guardado!" : "Guardar"}
           </button>
           <span className="text-xs text-slate-400">{user?.email}</span>
         </div>
       </div>
 
-      {/* PC Bridge */}
-      <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-900">PC Bridge</h2>
-          <div className="flex items-center gap-1.5 text-xs">
-            {bridgeActive ? (
-              <>
-                <Wifi className="h-3.5 w-3.5 text-green-500" />
-                <span className="text-green-600">Conectado</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="h-3.5 w-3.5 text-slate-400" />
-                <span className="text-slate-400">Desconectado</span>
-              </>
-            )}
-          </div>
-        </div>
-
-        <p className="text-xs text-slate-500">
-          El PC Bridge permite que Alfred navegue internet usando tu computador.
-          Esto es necesario para sitios como Lider, bancos y paginas con Cloudflare.
-        </p>
-
-        <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">Tu token de bridge</label>
-          <div className="flex gap-2">
-            <code className="flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-600">
-              {bridgeToken}
-            </code>
-            <button
-              onClick={copyToken}
-              className="flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50"
-            >
-              {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied ? "Copiado" : "Copiar"}
-            </button>
-          </div>
-        </div>
-
-        <div className="rounded-lg bg-slate-50 p-4 space-y-2">
-          <p className="text-xs font-medium text-slate-700">Como conectar:</p>
-          <ol className="text-xs text-slate-500 space-y-1 list-decimal list-inside">
-            <li>Descarga el script de bridge</li>
-            <li>Abre una terminal</li>
-            <li>Ejecuta: <code className="bg-slate-200 px-1 rounded">python3 alfred-bridge.py --token {bridgeToken}</code></li>
-            <li>Alfred podra navegar usando tu browser</li>
-          </ol>
-          <button className="flex items-center gap-1 rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800 mt-2">
-            <Download className="h-3.5 w-3.5" />
-            Descargar alfred-bridge.py
-          </button>
-        </div>
-      </div>
-
       {/* Channels */}
       <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
         <h2 className="text-sm font-semibold text-slate-900">Canales de comunicacion</h2>
-        <p className="text-xs text-slate-400">Alfred te puede hablar por estos canales. Configura cada uno para recibir y enviar mensajes.</p>
+        <p className="text-xs text-slate-400">Conecta tus canales para hablar con Alfred desde cualquier lugar.</p>
 
         <div className="space-y-4">
           {/* WhatsApp */}
-          <div className="rounded-lg border border-slate-200 p-4 space-y-3">
+          <div className={`rounded-lg border p-4 space-y-3 ${waStatus === "connected" ? "border-green-200 bg-green-50" : "border-slate-200"}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className={`inline-block h-2.5 w-2.5 rounded-full ${phone ? "bg-green-500" : "bg-slate-300"}`} />
+                <MessageCircle className={`h-4 w-4 ${waStatus === "connected" ? "text-green-600" : "text-slate-400"}`} />
                 <span className="text-sm font-medium text-slate-900">WhatsApp</span>
               </div>
-              <span className={`text-xs ${phone ? "text-green-600" : "text-slate-400"}`}>
-                {phone ? "Conectado" : "No configurado"}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={`inline-block h-2 w-2 rounded-full ${waStatus === "connected" ? "bg-green-500" : waStatus === "qr" ? "bg-yellow-500 animate-pulse" : "bg-slate-300"}`} />
+                <span className={`text-xs ${waStatus === "connected" ? "text-green-600" : waStatus === "qr" ? "text-yellow-600" : "text-slate-400"}`}>
+                  {waStatus === "connected" ? "Conectado" : waStatus === "qr" ? "Escanea el QR" : waStatus === "loading" ? "Verificando..." : "Desconectado"}
+                </span>
+              </div>
             </div>
-            <p className="text-xs text-slate-400">
-              Alfred responde tus mensajes de WhatsApp. Asegurate de que tu numero este registrado.
-            </p>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Numero WhatsApp</label>
-              <input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                placeholder="+56 9 1234 5678"
-              />
-            </div>
+
+            {waStatus === "connected" && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-green-700">Numero: +{waPhone}</span>
+                <button onClick={checkWhatsAppStatus} className="text-xs text-green-600 hover:underline flex items-center gap-1">
+                  <RefreshCw className="h-3 w-3" /> Verificar
+                </button>
+              </div>
+            )}
+
+            {waStatus === "qr" && (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-500">Escanea este codigo QR con WhatsApp en tu telefono:</p>
+                <div className="flex justify-center">
+                  {waQr ? (
+                    <div className="rounded-lg border border-slate-300 bg-white p-4">
+                      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(waQr)}`} alt="WhatsApp QR" className="h-48 w-48" />
+                    </div>
+                  ) : (
+                    <div className="flex h-48 w-48 items-center justify-center rounded-lg border border-dashed border-slate-300">
+                      <QrCode className="h-12 w-12 text-slate-300" />
+                    </div>
+                  )}
+                </div>
+                <div className="text-center">
+                  <button onClick={checkWhatsAppStatus} className="text-xs text-blue-600 hover:underline flex items-center gap-1 mx-auto">
+                    <RefreshCw className="h-3 w-3" /> Ya escanee, verificar conexion
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {waStatus === "disconnected" && (
+              <div className="space-y-2">
+                <p className="text-xs text-slate-500">WhatsApp no esta conectado. Haz click en &ldquo;Conectar&rdquo; para generar un codigo QR.</p>
+                <button onClick={checkWhatsAppStatus} className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700">
+                  Conectar WhatsApp
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Telegram */}
-          <div className="rounded-lg border border-slate-200 p-4 space-y-3">
+          <div className={`rounded-lg border p-4 space-y-3 ${tgConnected ? "border-blue-200 bg-blue-50" : "border-slate-200"}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="inline-block h-2.5 w-2.5 rounded-full bg-slate-300" />
+                <Send className={`h-4 w-4 ${tgConnected ? "text-blue-600" : "text-slate-400"}`} />
                 <span className="text-sm font-medium text-slate-900">Telegram</span>
               </div>
-              <span className="text-xs text-slate-400">No configurado</span>
+              <div className="flex items-center gap-2">
+                <span className={`inline-block h-2 w-2 rounded-full ${tgConnected ? "bg-blue-500" : "bg-slate-300"}`} />
+                <span className={`text-xs ${tgConnected ? "text-blue-600" : "text-slate-400"}`}>
+                  {tgConnected ? "Conectado" : "No configurado"}
+                </span>
+              </div>
             </div>
-            <p className="text-xs text-slate-400">
-              Conecta tu cuenta de Telegram para chatear con Alfred por ese canal.
+
+            <p className="text-xs text-slate-500">
+              Para conectar Telegram necesitas crear un Bot con @BotFather y poner el token aqui.
             </p>
+
+            <div className="rounded-lg bg-slate-50 p-3 space-y-2">
+              <p className="text-[10px] font-medium text-slate-700">Instrucciones:</p>
+              <ol className="text-[10px] text-slate-500 space-y-1 list-decimal list-inside">
+                <li>Abre Telegram y busca <code className="bg-slate-200 px-1 rounded">@BotFather</code></li>
+                <li>Envia <code className="bg-slate-200 px-1 rounded">/newbot</code> y sigue las instrucciones</li>
+                <li>Copia el token que te da (ej: <code className="bg-slate-200 px-1 rounded">123456:ABC-DEF...</code>)</li>
+                <li>Pegalo abajo y haz click en Conectar</li>
+              </ol>
+            </div>
+
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Username de Telegram</label>
-              <input
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                placeholder="@tu_usuario"
-                disabled
-              />
-              <p className="text-[10px] text-slate-400 mt-1">Proximamente</p>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Bot Token</label>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={tgBotToken}
+                  onChange={(e) => setTgBotToken(e.target.value)}
+                  className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+                />
+                <button
+                  disabled={!tgBotToken.includes(":")}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-40"
+                >
+                  Conectar
+                </button>
+              </div>
             </div>
           </div>
 
@@ -207,6 +238,43 @@ export default function SettingsPage() {
             </div>
             <p className="text-xs text-slate-500 mt-1">Estas usandolo ahora mismo. No requiere configuracion.</p>
           </div>
+        </div>
+      </div>
+
+      {/* PC Bridge */}
+      <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-900">PC Bridge</h2>
+          <div className="flex items-center gap-1.5 text-xs">
+            {bridgeActive ? (
+              <><Wifi className="h-3.5 w-3.5 text-green-500" /><span className="text-green-600">Conectado</span></>
+            ) : (
+              <><WifiOff className="h-3.5 w-3.5 text-slate-400" /><span className="text-slate-400">Desconectado</span></>
+            )}
+          </div>
+        </div>
+        <p className="text-xs text-slate-500">
+          Permite que Alfred navegue internet usando tu computador. Necesario para Lider, bancos y sitios con Cloudflare.
+        </p>
+        <div>
+          <label className="block text-xs font-medium text-slate-700 mb-1">Token</label>
+          <div className="flex gap-2">
+            <code className="flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-600">{bridgeToken}</code>
+            <button onClick={copyToken} className="flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">
+              {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? "Copiado" : "Copiar"}
+            </button>
+          </div>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-4 space-y-2">
+          <p className="text-xs font-medium text-slate-700">Como conectar:</p>
+          <ol className="text-xs text-slate-500 space-y-1 list-decimal list-inside">
+            <li>Descarga el script</li>
+            <li>Ejecuta: <code className="bg-slate-200 px-1 rounded">python3 alfred-bridge.py --token {bridgeToken}</code></li>
+          </ol>
+          <button className="flex items-center gap-1 rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800 mt-2">
+            <Download className="h-3.5 w-3.5" /> Descargar alfred-bridge.py
+          </button>
         </div>
       </div>
     </div>
