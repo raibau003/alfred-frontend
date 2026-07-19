@@ -9,8 +9,9 @@ import { AuthGate } from "@/components/auth/AuthGate";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Alfred",
-  description: "Tu asistente personal con IA",
+  title: "Alfred — Tu agente para simplificar tu vida",
+  description: "Tu agente para simplificar tu vida",
+  icons: { icon: "/alfred-favicon.svg" },
 };
 
 export default function RootLayout({
