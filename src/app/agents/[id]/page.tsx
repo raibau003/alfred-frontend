@@ -2,10 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Bot, Plug, Package, Plus, Trash2, Search } from "lucide-react";
+import { Bot, Plug, Package, Plus, Trash2, Search, Sparkles, Download, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import type { Agent, Connector } from "@/lib/supabase/types";
+
+interface MarketplaceSkill {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  category: string;
+  tags: string[];
+  compatible_agents: string[];
+  install_count: number;
+  skill_content: string;
+  created_at?: string;
+}
 
 interface AgentMcp {
   id: string;
@@ -24,6 +37,9 @@ export default function AgentDetailPage() {
   const [connectors, setConnectors] = useState<Connector[]>([]);
   const [showAddMcp, setShowAddMcp] = useState(false);
   const [newMcp, setNewMcp] = useState({ name: "", package_name: "", description: "" });
+  const [marketplaceSkills, setMarketplaceSkills] = useState<MarketplaceSkill[]>([]);
+  const [showMarketplace, setShowMarketplace] = useState(false);
+  const [installedSlugs, setInstalledSlugs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const supabase = createClient();
@@ -39,6 +55,37 @@ export default function AgentDetailPage() {
       });
     }
   }, [id, user]);
+
+  // Load marketplace skills compatible with this agent
+  const loadMarketplace = async () => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("skills_marketplace")
+      .select("*")
+      .contains("compatible_agents", [id])
+      .order("install_count", { ascending: false });
+    if (data) setMarketplaceSkills(data as MarketplaceSkill[]);
+    setShowMarketplace(true);
+  };
+
+  const installSkill = async (skill: MarketplaceSkill) => {
+    // Add as MCP to this agent
+    const supabase = createClient();
+    await supabase.from("agent_mcps").insert({
+      agent_id: id,
+      mcp_name: skill.name,
+      mcp_package: `skill:${skill.slug}`,
+      description: skill.description,
+      enabled: true,
+      installed_by: user?.id,
+    });
+    // Increment install count
+    await supabase.from("skills_marketplace").update({ install_count: skill.install_count + 1 }).eq("id", skill.id);
+    setInstalledSlugs(prev => new Set([...prev, skill.slug]));
+    // Refresh MCPs
+    const { data } = await supabase.from("agent_mcps").select("*").eq("agent_id", id);
+    if (data) setMcps(data as AgentMcp[]);
+  };
 
   const toggleMcp = async (mcpId: string, enabled: boolean) => {
     const supabase = createClient();
@@ -164,6 +211,71 @@ export default function AgentDetailPage() {
           ))}
           {mcps.length === 0 && <p className="py-3 text-center text-xs text-slate-400">Sin MCPs configurados</p>}
         </div>
+      </div>
+
+      {/* Skills Marketplace */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-yellow-500" />
+            Skills Marketplace
+          </h2>
+          <button
+            onClick={loadMarketplace}
+            className="flex items-center gap-1 rounded-md bg-yellow-500 px-3 py-1.5 text-xs text-white hover:bg-yellow-600"
+          >
+            <Search className="h-3 w-3" />
+            {showMarketplace ? "Actualizar" : "Buscar skills"}
+          </button>
+        </div>
+
+        {showMarketplace && (
+          <div className="space-y-2">
+            {marketplaceSkills.length > 0 ? (
+              marketplaceSkills.map((skill) => {
+                const installed = installedSlugs.has(skill.slug) || mcps.some(m => m.mcp_package === `skill:${skill.slug}`);
+                const isNew = new Date(skill.created_at || "").getTime() > Date.now() - 7 * 86400000;
+                return (
+                  <div key={skill.id} className="flex items-start justify-between rounded-lg border border-slate-200 p-3 hover:bg-slate-50">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-slate-900">{skill.name}</p>
+                        {isNew && <span className="rounded bg-yellow-100 px-1.5 py-0.5 text-[9px] font-bold text-yellow-700">NEW</span>}
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] text-slate-500">{skill.category}</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">{skill.description}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {(skill.tags || []).slice(0, 3).map(tag => (
+                          <span key={tag} className="text-[9px] text-slate-400">#{tag}</span>
+                        ))}
+                        <span className="text-[9px] text-slate-300">{skill.install_count} installs</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => !installed && installSkill(skill)}
+                      disabled={installed}
+                      className={`shrink-0 ml-3 flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                        installed
+                          ? "bg-green-100 text-green-700 cursor-default"
+                          : "bg-blue-600 text-white hover:bg-blue-700"
+                      }`}
+                    >
+                      {installed ? <><Check className="h-3 w-3" /> Instalado</> : <><Download className="h-3 w-3" /> Instalar</>}
+                    </button>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="py-4 text-center text-xs text-slate-400">No hay skills disponibles para este agente</p>
+            )}
+          </div>
+        )}
+
+        {!showMarketplace && (
+          <p className="text-xs text-slate-400 text-center py-2">
+            Busca skills para darle mas capacidades a este agente
+          </p>
+        )}
       </div>
 
       {/* Connectors */}
