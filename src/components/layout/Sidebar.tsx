@@ -18,6 +18,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/agents", label: "Agentes", icon: Bot },
   { href: "/connectors", label: "Conectores", icon: Plug },
+  { href: "/settings", label: "Configuracion", icon: Settings },
 ];
 
 export function Sidebar() {
