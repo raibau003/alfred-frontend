@@ -176,6 +176,95 @@ export default function SettingsPage() {
                 </button>
               </div>
             )}
+
+            {/* WhatsApp advanced config */}
+            {waStatus === "connected" && (
+              <div className="border-t border-slate-200 pt-3 mt-3 space-y-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Configuracion avanzada</p>
+
+                {/* Allow others to talk */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-700">Permitir que otros me hablen</p>
+                    <p className="text-[10px] text-slate-400">Si desactivas, solo tu puedes hablarle a Alfred</p>
+                  </div>
+                  <button className="relative inline-flex h-5 w-9 items-center rounded-full bg-green-600 transition-colors">
+                    <span className="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow translate-x-4" />
+                  </button>
+                </div>
+
+                {/* Tag in groups */}
+                <div>
+                  <p className="text-xs text-slate-700">Tag para grupos</p>
+                  <p className="text-[10px] text-slate-400 mb-1">En grupos, Alfred solo responde si lo mencionan con este tag</p>
+                  <input className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs" defaultValue="@alfred" />
+                </div>
+
+                {/* Auto-respond or manual */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-700">Respuesta automatica</p>
+                    <p className="text-[10px] text-slate-400">Si desactivas, Alfred espera tu confirmacion antes de responder</p>
+                  </div>
+                  <button className="relative inline-flex h-5 w-9 items-center rounded-full bg-green-600 transition-colors">
+                    <span className="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow translate-x-4" />
+                  </button>
+                </div>
+
+                {/* Schedule */}
+                <div>
+                  <p className="text-xs text-slate-700">Horario de atencion</p>
+                  <p className="text-[10px] text-slate-400 mb-1">Fuera de este horario, Alfred envia respuesta automatica</p>
+                  <div className="flex items-center gap-2">
+                    <input type="time" className="rounded-md border border-slate-300 px-2 py-1 text-xs" defaultValue="08:00" />
+                    <span className="text-xs text-slate-400">a</span>
+                    <input type="time" className="rounded-md border border-slate-300 px-2 py-1 text-xs" defaultValue="22:00" />
+                  </div>
+                </div>
+
+                {/* Read-only mode */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-700">Modo solo lectura</p>
+                    <p className="text-[10px] text-slate-400">Alfred lee chats pero no responde (monitoreo)</p>
+                  </div>
+                  <button className="relative inline-flex h-5 w-9 items-center rounded-full bg-slate-300 transition-colors">
+                    <span className="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow translate-x-0.5" />
+                  </button>
+                </div>
+
+                {/* Forward unknown to owner */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-700">Reenviar desconocidos</p>
+                    <p className="text-[10px] text-slate-400">Si alguien pregunta algo que no sabe, te reenvia la pregunta</p>
+                  </div>
+                  <button className="relative inline-flex h-5 w-9 items-center rounded-full bg-green-600 transition-colors">
+                    <span className="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow translate-x-4" />
+                  </button>
+                </div>
+
+                {/* Response style */}
+                <div>
+                  <p className="text-xs text-slate-700">Estilo de respuesta</p>
+                  <select className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs mt-1">
+                    <option value="conciso">Conciso (1-2 oraciones)</option>
+                    <option value="normal" selected>Normal</option>
+                    <option value="detallado">Detallado (con explicaciones)</option>
+                  </select>
+                </div>
+
+                {/* Language */}
+                <div>
+                  <p className="text-xs text-slate-700">Idioma</p>
+                  <select className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs mt-1">
+                    <option value="es" selected>Espanol</option>
+                    <option value="en">English</option>
+                    <option value="auto">Auto-detectar</option>
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Telegram */}
