@@ -144,28 +144,68 @@ export default function SettingsPage() {
 
       {/* Channels */}
       <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
-        <h2 className="text-sm font-semibold text-slate-900">Canales conectados</h2>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
-              <span className="text-sm text-slate-700">WhatsApp</span>
+        <h2 className="text-sm font-semibold text-slate-900">Canales de comunicacion</h2>
+        <p className="text-xs text-slate-400">Alfred te puede hablar por estos canales. Configura cada uno para recibir y enviar mensajes.</p>
+
+        <div className="space-y-4">
+          {/* WhatsApp */}
+          <div className="rounded-lg border border-slate-200 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className={`inline-block h-2.5 w-2.5 rounded-full ${phone ? "bg-green-500" : "bg-slate-300"}`} />
+                <span className="text-sm font-medium text-slate-900">WhatsApp</span>
+              </div>
+              <span className={`text-xs ${phone ? "text-green-600" : "text-slate-400"}`}>
+                {phone ? "Conectado" : "No configurado"}
+              </span>
             </div>
-            <span className="text-xs text-slate-400">{phone || "No configurado"}</span>
+            <p className="text-xs text-slate-400">
+              Alfred responde tus mensajes de WhatsApp. Asegurate de que tu numero este registrado.
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Numero WhatsApp</label>
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                placeholder="+56 9 1234 5678"
+              />
+            </div>
           </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
-              <span className="text-sm text-slate-700">Web</span>
+
+          {/* Telegram */}
+          <div className="rounded-lg border border-slate-200 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-slate-300" />
+                <span className="text-sm font-medium text-slate-900">Telegram</span>
+              </div>
+              <span className="text-xs text-slate-400">No configurado</span>
             </div>
-            <span className="text-xs text-slate-400">Siempre activo</span>
+            <p className="text-xs text-slate-400">
+              Conecta tu cuenta de Telegram para chatear con Alfred por ese canal.
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Username de Telegram</label>
+              <input
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                placeholder="@tu_usuario"
+                disabled
+              />
+              <p className="text-[10px] text-slate-400 mt-1">Proximamente</p>
+            </div>
           </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="inline-block h-2 w-2 rounded-full bg-slate-300" />
-              <span className="text-sm text-slate-700">Telegram</span>
+
+          {/* Web */}
+          <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-green-500" />
+                <span className="text-sm font-medium text-slate-900">Web</span>
+              </div>
+              <span className="text-xs text-green-600">Siempre activo</span>
             </div>
-            <span className="text-xs text-slate-400">No configurado</span>
+            <p className="text-xs text-slate-500 mt-1">Estas usandolo ahora mismo. No requiere configuracion.</p>
           </div>
         </div>
       </div>

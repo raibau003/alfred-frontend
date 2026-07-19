@@ -38,8 +38,12 @@ export default function AgentsPage() {
     setAgents((prev) => prev.map((a) => (a.id === id ? { ...a, enabled } : a)));
   };
 
-  // Hide internal agents (auditor, mcp-factory, scheduler)
-  const publicAgents = agents.filter((a) => !(a.config as any)?.internal && !(a as any).internal);
+  // Hide internal agents and WhatsApp/Telegram (those are channels, not agents)
+  const publicAgents = agents.filter((a) => {
+    if ((a as any).internal) return false;
+    if (a.id === "agent-whatsapp") return false; // shown in Settings as channel
+    return true;
+  });
   const categories = [...new Set(publicAgents.map((a) => a.category).filter(Boolean))];
   const filtered = filter ? publicAgents.filter((a) => a.category === filter) : publicAgents;
 
