@@ -1,10 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, MessageSquare, Globe, MessageCircle } from "lucide-react";
+import { Plus, MessageSquare, Globe, MessageCircle, FileText, ChevronDown, ChevronRight, Download } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import type { ConversationThread } from "@/lib/supabase/types";
+
+interface Artifact {
+  id: string;
+  name: string;
+  type: string;
+  content: string | null;
+  created_at: string;
+}
 
 interface Props {
   activeThreadId: string | null;
@@ -45,6 +53,8 @@ function groupByDate(threads: ConversationThread[]) {
 export function ThreadSidebar({ activeThreadId, onSelectThread, onNewThread }: Props) {
   const { user } = useAuth();
   const [threads, setThreads] = useState<ConversationThread[]>([]);
+  const [expandedThread, setExpandedThread] = useState<string | null>(null);
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -59,6 +69,20 @@ export function ThreadSidebar({ activeThreadId, onSelectThread, onNewThread }: P
         if (data) setThreads(data);
       });
   }, [user, activeThreadId]); // reload when thread changes
+
+  // Load artifacts when thread is expanded
+  useEffect(() => {
+    if (!expandedThread) { setArtifacts([]); return; }
+    const supabase = createClient();
+    supabase
+      .from("artifacts")
+      .select("*")
+      .eq("thread_id", expandedThread)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (data) setArtifacts(data as Artifact[]);
+      });
+  }, [expandedThread]);
 
   const groups = groupByDate(threads);
 
@@ -85,19 +109,45 @@ export function ThreadSidebar({ activeThreadId, onSelectThread, onNewThread }: P
               {group.threads.map((t) => {
                 const Icon = channelIcons[t.channel] ?? MessageSquare;
                 const active = t.id === activeThreadId;
+                const expanded = expandedThread === t.id;
+                const threadArtifacts = expanded ? artifacts : [];
                 return (
-                  <button
-                    key={t.id}
-                    onClick={() => onSelectThread(t.id)}
-                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors ${
-                      active
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    <Icon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                    <span className="truncate">{t.title || "Sin titulo"}</span>
-                  </button>
+                  <div key={t.id}>
+                    <div className="flex items-center">
+                      <button
+                        onClick={() => setExpandedThread(expanded ? null : t.id)}
+                        className="p-0.5 text-slate-300 hover:text-slate-500"
+                      >
+                        {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                      </button>
+                      <button
+                        onClick={() => onSelectThread(t.id)}
+                        className={`flex flex-1 items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-sm transition-colors ${
+                          active
+                            ? "bg-blue-50 text-blue-700"
+                            : "text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        <Icon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                        <span className="truncate">{t.title || "Sin titulo"}</span>
+                      </button>
+                    </div>
+                    {expanded && (
+                      <div className="ml-5 mt-0.5 space-y-0.5">
+                        {threadArtifacts.length > 0 ? (
+                          threadArtifacts.map((a) => (
+                            <div key={a.id} className="flex items-center gap-1.5 rounded px-2 py-1 text-[10px] text-slate-500 hover:bg-slate-100 cursor-pointer group">
+                              <FileText className="h-3 w-3 text-slate-400" />
+                              <span className="truncate flex-1">{a.name}</span>
+                              <Download className="h-3 w-3 text-slate-300 opacity-0 group-hover:opacity-100" />
+                            </div>
+                          ))
+                        ) : (
+                          <p className="px-2 py-1 text-[10px] text-slate-300">Sin artefactos</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
