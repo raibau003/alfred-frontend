@@ -4,13 +4,22 @@ import { useState } from "react";
 import { Search, ShoppingCart, Zap, ArrowDownUp, Store, Loader2 } from "lucide-react";
 import { ROUTER_URL } from "@/lib/alfred/client";
 
-interface Comparison {
+interface Product {
+  id?: string;
   store: string;
   name: string;
+  brand?: string;
   price: number;
+  original_price?: number;
+  discount_pct?: number;
+  image_url?: string;
+  product_url?: string;
   available: boolean;
-  url?: string;
+  sku?: string;
 }
+
+// Backwards compat
+type Comparison = Product;
 
 export default function ShoppingPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -22,19 +31,47 @@ export default function ShoppingPage() {
   const [optimalResult, setOptimalResult] = useState<string | null>(null);
   const [strategy, setStrategy] = useState<"cheapest_total" | "single_store_cheapest">("cheapest_total");
 
+  const [cacheSource, setCacheSource] = useState<string>("");
+
   const searchProduct = async () => {
     if (!searchQuery.trim()) return;
     setComparing(true);
     setComparisons([]);
+    setCacheSource("");
+
     try {
-      const resp = await fetch(`${ROUTER_URL}/shopping/compare`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product: searchQuery }),
-      });
-      const data = await resp.json();
-      if (data.comparisons?.length > 0) {
-        setComparisons(data.comparisons);
+      // Try cache first (instant)
+      const cacheResp = await fetch(`${ROUTER_URL}/products/search?q=${encodeURIComponent(searchQuery)}&country=CL`);
+      const cacheData = await cacheResp.json();
+
+      if (cacheData.products?.length > 0) {
+        setComparisons(cacheData.products);
+        setCacheSource(cacheData.source);
+        setComparing(false);
+        return;
+      }
+
+      // Cache miss — wait and retry
+      setCacheSource("scraping");
+      await new Promise(r => setTimeout(r, 15000));
+
+      const retryResp = await fetch(`${ROUTER_URL}/products/search?q=${encodeURIComponent(searchQuery)}&country=CL`);
+      const retryData = await retryResp.json();
+      if (retryData.products?.length > 0) {
+        setComparisons(retryData.products);
+        setCacheSource(retryData.source);
+      } else {
+        // Fallback to agent-compras direct
+        const agentResp = await fetch(`${ROUTER_URL}/shopping/compare`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ product: searchQuery }),
+        });
+        const agentData = await agentResp.json();
+        if (agentData.comparisons?.length > 0) {
+          setComparisons(agentData.comparisons);
+          setCacheSource("agent");
+        }
       }
     } catch {}
     setComparing(false);
@@ -109,42 +146,58 @@ export default function ShoppingPage() {
           {/* Comparison results */}
           {comparisons.length > 0 && (
             <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-              <h2 className="text-sm font-semibold text-slate-900">
-                Resultados para &ldquo;{searchQuery}&rdquo;
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-slate-900">
+                  Resultados para &ldquo;{searchQuery}&rdquo;
+                </h2>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                  cacheSource === "cache" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                }`}>
+                  {cacheSource === "cache" ? "Cache (instantaneo)" : cacheSource === "agent" ? "Busqueda en vivo" : "Actualizado"}
+                </span>
+              </div>
               <div className="space-y-2">
-                {comparisons.sort((a, b) => a.price - b.price).map((c, i) => (
-                  <div
-                    key={i}
-                    className={`flex items-center justify-between rounded-lg border p-3 ${
-                      cheapest && c.store === cheapest.store && c.price === cheapest.price
-                        ? "border-green-300 bg-green-50"
-                        : "border-slate-200"
-                    }`}
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">{c.name}</p>
-                      <p className="text-xs text-slate-400 uppercase">{c.store}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className={`text-sm font-bold ${cheapest && c.store === cheapest.store && c.price === cheapest.price ? "text-green-600" : "text-slate-900"}`}>
-                        ${c.price.toLocaleString("es-CL")}
-                      </p>
-                      {cheapest && c.store === cheapest.store && c.price === cheapest.price && (
-                        <span className="text-[10px] text-green-600 font-medium">MAS BARATO</span>
-                      )}
-                      {!c.available && <span className="text-[10px] text-red-500">No disponible</span>}
-                    </div>
-                    <button
-                      onClick={() => {
-                        setShoppingList(prev => [...prev, `${c.name} (${c.store})`]);
-                      }}
-                      className="ml-2 rounded-md bg-blue-600 px-2 py-1 text-[10px] text-white hover:bg-blue-700"
+                {comparisons.sort((a, b) => a.price - b.price).map((c, i) => {
+                  const isCheapest = cheapest && c.store === cheapest.store && c.price === cheapest.price;
+                  return (
+                    <div
+                      key={i}
+                      className={`flex items-center gap-3 rounded-lg border p-3 ${
+                        isCheapest ? "border-green-300 bg-green-50" : "border-slate-200"
+                      }`}
                     >
-                      Agregar
-                    </button>
-                  </div>
-                ))}
+                      {c.image_url && (
+                        <img src={c.image_url} alt={c.name} className="h-14 w-14 rounded-md object-contain bg-white" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{c.name}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {c.brand && <span className="text-[10px] text-slate-500">{c.brand}</span>}
+                          <span className="text-[10px] text-slate-400 uppercase font-semibold">{c.store}</span>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className={`text-sm font-bold ${isCheapest ? "text-green-600" : "text-slate-900"}`}>
+                          ${c.price.toLocaleString("es-CL")}
+                        </p>
+                        {c.original_price && c.original_price > c.price && (
+                          <p className="text-[10px] text-slate-400 line-through">${c.original_price.toLocaleString("es-CL")}</p>
+                        )}
+                        {c.discount_pct && c.discount_pct > 0 && (
+                          <span className="text-[10px] text-red-600 font-bold">-{c.discount_pct}%</span>
+                        )}
+                        {isCheapest && <span className="block text-[10px] text-green-600 font-medium">MAS BARATO</span>}
+                        {!c.available && <span className="block text-[10px] text-red-500">Agotado</span>}
+                      </div>
+                      <button
+                        onClick={() => setShoppingList(prev => [...prev, `${c.name} (${c.store})`])}
+                        className="shrink-0 rounded-md bg-blue-600 px-2 py-1 text-[10px] text-white hover:bg-blue-700"
+                      >
+                        Agregar
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
