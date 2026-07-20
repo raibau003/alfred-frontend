@@ -162,8 +162,36 @@ export function ChatView({ messages, busy, connected, onSend, userName, onToggle
                   }`}
                 >
                   {msg.role === "assistant" ? (
-                    <div className="prose prose-sm prose-slate max-w-none [&_table]:text-xs [&_th]:px-2 [&_td]:px-2 [&_h2]:text-sm [&_h3]:text-sm [&_p]:my-1">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                    <div>
+                      {/* Progress bar if message has percentage */}
+                      {(() => {
+                        const pctMatch = msg.content.match(/(\d+)%/);
+                        const timeMatch = msg.content.match(/~(\d+)s/);
+                        if (pctMatch) {
+                          const pct = parseInt(pctMatch[1]);
+                          const timeLeft = timeMatch ? parseInt(timeMatch[1]) : null;
+                          const label = msg.content.split("—")[0].trim();
+                          return (
+                            <div className="space-y-1.5">
+                              <p className="text-xs text-slate-600">{label}</p>
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-slate-200 rounded-full h-2 overflow-hidden">
+                                  <div className="h-full bg-[#e8864a] rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                                </div>
+                                <span className="text-[10px] text-slate-500 whitespace-nowrap">{pct}%</span>
+                              </div>
+                              {timeLeft && <p className="text-[9px] text-slate-400">~{timeLeft}s restantes</p>}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                      {/* Regular markdown content (if no progress bar) */}
+                      {!msg.content.match(/\d+%.*restantes/) && (
+                        <div className="prose prose-sm prose-slate max-w-none [&_table]:text-xs [&_th]:px-2 [&_td]:px-2 [&_h2]:text-sm [&_h3]:text-sm [&_p]:my-1">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <p className="whitespace-pre-wrap">{msg.content}</p>
