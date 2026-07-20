@@ -422,29 +422,33 @@ export default function SettingsPage() {
           Permite que Alfred navegue internet usando tu computador. Necesario para Lider, bancos y sitios con Cloudflare.
         </p>
 
-        {/* Method 1: Chrome Extension */}
+        {/* Token — always visible */}
+        <div className="rounded-lg border border-slate-200 bg-white p-3">
+          <label className="block text-xs font-medium text-slate-700 mb-1.5">Tu token (solo se necesita una vez)</label>
+          <div className="flex gap-2">
+            <code className="flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-700 select-all">{bridgeToken}</code>
+            <button onClick={copyToken} className="flex items-center gap-1 rounded-lg bg-[#0a1628] px-3 py-2 text-xs text-white hover:bg-[#1e3a5f]">
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? "Copiado!" : "Copiar"}
+            </button>
+          </div>
+        </div>
+
+        {/* Chrome Extension */}
         <div className="rounded-lg border border-[#0a1628]/20 bg-[#0a1628]/5 p-4 space-y-3">
           <div className="flex items-center gap-2">
             <span className="text-sm">🧩</span>
-            <p className="text-xs font-medium text-blue-900">Extension de Chrome (recomendado)</p>
+            <p className="text-xs font-medium text-[#0a1628]">Extension de Chrome</p>
           </div>
-          <p className="text-[10px] text-[#0a1628]">Instala la extension en Chrome y Alfred podra navegar usando tu browser.</p>
-          <div className="rounded-lg bg-white/60 p-3 space-y-2">
-            <p className="text-[10px] font-medium text-blue-900">Como instalar:</p>
-            <ol className="text-[10px] text-[#0a1628] space-y-1 list-decimal list-inside">
-              <li>Descarga el archivo ZIP</li>
-              <li>Abre Chrome → <code className="bg-blue-100 px-1 rounded">chrome://extensions</code></li>
-              <li>Activa &ldquo;Modo desarrollador&rdquo; (arriba a la derecha)</li>
-              <li>Arrastra el ZIP o haz click &ldquo;Cargar descomprimida&rdquo;</li>
-              <li>Click en el icono de Alfred en la barra → pon tu token → Conectar</li>
-            </ol>
-          </div>
-          <div className="flex items-center gap-2">
-            <a href="/alfred-bridge-extension.zip" download className="inline-flex items-center gap-1 rounded-md bg-[#0a1628] px-4 py-2 text-xs font-medium text-white hover:bg-[#1e3a5f]">
-              <Download className="h-3.5 w-3.5" /> Descargar Extension
-            </a>
-            <span className="text-[10px] text-blue-500">7 KB</span>
-          </div>
+          <ol className="text-[10px] text-[#0a1628] space-y-1.5 list-decimal list-inside">
+            <li>Descarga e instala la extension</li>
+            <li>Click en el icono <strong>A</strong> en la barra de Chrome</li>
+            <li>Pega tu token (copialo arriba) y haz click Conectar</li>
+            <li>Listo — funciona siempre que Chrome este abierto</li>
+          </ol>
+          <a href="/alfred-bridge-extension.zip" download className="inline-flex items-center gap-1 rounded-md bg-[#0a1628] px-4 py-2 text-xs font-medium text-white hover:bg-[#1e3a5f]">
+            <Download className="h-3.5 w-3.5" /> Descargar Extension
+          </a>
         </div>
 
         {/* Method 2: Script Python (advanced) */}
