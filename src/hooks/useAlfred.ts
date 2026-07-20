@@ -106,7 +106,9 @@ export function useAlfred(threadId?: string) {
       pollRef.current = setInterval(async () => {
         if (!sessionRef.current || foundFinal) return;
         try {
-          const { messages: msgs, status } = await getMessages(sessionRef.current);
+          const result = await getMessages(sessionRef.current);
+          const { messages: msgs, status } = result;
+          console.log(`[alfred-poll] session=${sessionRef.current?.substring(0,20)} status=${status} msgs=${msgs.length}`);
 
           // Show any new assistant messages
           let hasNew = false;
@@ -163,7 +165,9 @@ export function useAlfred(threadId?: string) {
             if (pollRef.current) clearInterval(pollRef.current);
             setBusy(false);
           }
-        } catch {}
+        } catch (err) {
+          console.error(`[alfred-poll] error:`, err);
+        }
       }, 2000);
     },
     [saveMessage]
