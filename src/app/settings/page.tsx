@@ -421,26 +421,55 @@ export default function SettingsPage() {
         <p className="text-xs text-slate-500">
           Permite que Alfred navegue internet usando tu computador. Necesario para Lider, bancos y sitios con Cloudflare.
         </p>
-        <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">Token</label>
-          <div className="flex gap-2">
-            <code className="flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-600">{bridgeToken}</code>
-            <button onClick={copyToken} className="flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">
-              {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied ? "Copiado" : "Copiar"}
-            </button>
+
+        {/* Method 1: Chrome Extension (coming soon) */}
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">🧩</span>
+            <p className="text-xs font-medium text-blue-900">Extension de Chrome (recomendado)</p>
+            <span className="rounded bg-yellow-100 px-1.5 py-0.5 text-[9px] font-bold text-yellow-700">PRONTO</span>
           </div>
+          <p className="text-[10px] text-blue-700">Instala la extension desde Chrome Web Store y Alfred podra navegar usando tu browser. Sin configuracion.</p>
         </div>
-        <div className="rounded-lg bg-slate-50 p-4 space-y-2">
-          <p className="text-xs font-medium text-slate-700">Como conectar:</p>
-          <ol className="text-xs text-slate-500 space-y-1 list-decimal list-inside">
-            <li>Descarga el script</li>
-            <li>Ejecuta: <code className="bg-slate-200 px-1 rounded">python3 alfred-bridge.py --token {bridgeToken}</code></li>
-          </ol>
-          <button className="flex items-center gap-1 rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800 mt-2">
-            <Download className="h-3.5 w-3.5" /> Descargar alfred-bridge.py
-          </button>
-        </div>
+
+        {/* Method 2: Script Python (advanced) */}
+        <details className="group">
+          <summary className="flex items-center gap-2 cursor-pointer text-xs text-slate-500 hover:text-slate-700">
+            <span className="group-open:rotate-90 transition-transform">▶</span>
+            Metodo avanzado (script Python)
+          </summary>
+          <div className="mt-3 rounded-lg bg-slate-50 p-4 space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Tu token</label>
+              <div className="flex gap-2">
+                <code className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono text-slate-600">{bridgeToken}</code>
+                <button onClick={copyToken} className="flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-600 hover:bg-white">
+                  {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copied ? "Copiado" : "Copiar"}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-slate-700">Instrucciones:</p>
+              <ol className="text-[10px] text-slate-500 space-y-1 list-decimal list-inside">
+                <li>Descarga el archivo <code className="bg-slate-200 px-1 rounded">alfred-bridge.py</code></li>
+                <li>Abre la Terminal (Mac) o CMD (Windows)</li>
+                <li>Instala dependencias: <code className="bg-slate-200 px-1 rounded">pip3 install playwright websockets && python3 -m playwright install chromium</code></li>
+                <li>Ejecuta: <code className="bg-slate-200 px-1 rounded">python3 alfred-bridge.py --token {bridgeToken}</code></li>
+                <li>Se abrira un navegador controlado por Alfred</li>
+              </ol>
+            </div>
+
+            <a
+              href="/alfred-bridge.py"
+              download="alfred-bridge.py"
+              className="inline-flex items-center gap-1 rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800"
+            >
+              <Download className="h-3.5 w-3.5" /> Descargar alfred-bridge.py
+            </a>
+          </div>
+        </details>
       </div>
     </div>
   );
