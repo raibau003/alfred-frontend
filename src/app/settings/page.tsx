@@ -55,10 +55,16 @@ export default function SettingsPage() {
       }
     });
     setBridgeToken(`bridge_${user.id.substring(0, 16)}`);
-    fetch(`${ROUTER_URL}/bridge/status`).then(r => r.json()).then(data => {
-      const active = data.bridges?.some((b: { token: string }) => b.token.startsWith(`bridge_${user.id.substring(0, 8)}`));
-      setBridgeActive(!!active);
-    }).catch(() => {});
+    // Check bridge status now and every 10s
+    const checkBridge = () => {
+      fetch(`${ROUTER_URL}/bridge/status`).then(r => r.json()).then(data => {
+        const active = data.bridges?.some((b: { token: string }) => b.token.startsWith(`bridge_${user.id.substring(0, 8)}`));
+        setBridgeActive(!!active);
+      }).catch(() => {});
+    };
+    checkBridge();
+    const bridgeInterval = setInterval(checkBridge, 10000);
+    return () => clearInterval(bridgeInterval);
 
     // Load channel settings
     supabase.from("channel_settings").select("*").eq("user_id", user.id).single().then(({ data }) => {
@@ -439,34 +445,60 @@ export default function SettingsPage() {
       </div>
 
       {/* PC Bridge */}
-      <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+      <div className={`rounded-xl border p-6 space-y-4 ${bridgeActive ? "border-green-200 bg-green-50" : "border-slate-200 bg-white"}`}>
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-900">PC Bridge</h2>
-          <div className="flex items-center gap-1.5 text-xs">
-            {bridgeActive ? (
-              <><Wifi className="h-3.5 w-3.5 text-green-500" /><span className="text-green-600">Conectado</span></>
-            ) : (
-              <><WifiOff className="h-3.5 w-3.5 text-slate-400" /><span className="text-slate-400">Desconectado</span></>
+          <div className="flex items-center gap-2">
+            <Wifi className={`h-4 w-4 ${bridgeActive ? "text-green-600" : "text-slate-400"}`} />
+            <h2 className="text-sm font-semibold text-slate-900">PC Bridge</h2>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className={`inline-block h-2 w-2 rounded-full ${bridgeActive ? "bg-green-500" : "bg-slate-300"}`} />
+              <span className={bridgeActive ? "text-green-600" : "text-slate-400"}>
+                {bridgeActive ? "Conectado" : "Desconectado"}
+              </span>
+            </div>
+            {bridgeActive && (
+              <button
+                onClick={async () => {
+                  // Unregister from Router
+                  try { await fetch(`${ROUTER_URL}/bridge/disconnect`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: bridgeToken }) }); } catch {}
+                  setBridgeActive(false);
+                }}
+                className="text-xs text-red-500 hover:underline"
+              >
+                Desconectar
+              </button>
             )}
           </div>
         </div>
-        <p className="text-xs text-slate-500">
-          Permite que Alfred navegue internet usando tu computador. Necesario para Lider, bancos y sitios con Cloudflare.
-        </p>
 
-        {/* Token — always visible */}
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <label className="block text-xs font-medium text-slate-700 mb-1.5">Tu token (solo se necesita una vez)</label>
-          <div className="flex gap-2">
-            <code className="flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-700 select-all">{bridgeToken}</code>
-            <button onClick={copyToken} className="flex items-center gap-1 rounded-lg bg-[#0a1628] px-3 py-2 text-xs text-white hover:bg-[#1e3a5f]">
-              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied ? "Copiado!" : "Copiar"}
-            </button>
+        {bridgeActive ? (
+          <p className="text-xs text-green-700">
+            Alfred tiene control de tu computador. Puede abrir Chrome, navegar sitios y ejecutar acciones.
+          </p>
+        ) : (
+          <p className="text-xs text-slate-500">
+            Permite que Alfred navegue internet usando tu computador. Necesario para Lider, bancos y sitios con Cloudflare.
+          </p>
+        )}
+
+        {/* Token — only show if not connected */}
+        {!bridgeActive && (
+          <div className="rounded-lg border border-slate-200 bg-white p-3">
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">Tu token (solo se necesita una vez)</label>
+            <div className="flex gap-2">
+              <code className="flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-700 select-all">{bridgeToken}</code>
+              <button onClick={copyToken} className="flex items-center gap-1 rounded-lg bg-[#0a1628] px-3 py-2 text-xs text-white hover:bg-[#1e3a5f]">
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? "Copiado!" : "Copiar"}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Install — OS detection */}
+        {/* Install — only show when not connected */}
+        {!bridgeActive && <>
         <div className="rounded-lg border border-[#0a1628]/20 bg-[#0a1628]/5 p-4 space-y-3">
           <div className="flex items-center gap-2">
             <span className="text-sm">💻</span>
@@ -543,6 +575,7 @@ export default function SettingsPage() {
             </a>
           </div>
         </details>
+        </>}
       </div>
     </div>
   );
