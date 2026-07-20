@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Bot, Plug, Package, Plus, Trash2, Search, Sparkles, Download, Check } from "lucide-react";
+import Link from "next/link";
+import { Bot, Plug, Package, Plus, Trash2, Search, Sparkles, Download, Check, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import type { Agent, Connector } from "@/lib/supabase/types";
@@ -63,6 +64,7 @@ export default function AgentDetailPage() {
       .from("skills_marketplace")
       .select("*")
       .contains("compatible_agents", [id])
+      .neq("internal", true)
       .order("install_count", { ascending: false });
     if (data) setMarketplaceSkills(data as MarketplaceSkill[]);
     setShowMarketplace(true);
@@ -121,6 +123,11 @@ export default function AgentDetailPage() {
 
   return (
     <div className="max-w-3xl space-y-6">
+      {/* Back button */}
+      <Link href="/agents" className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 transition-colors">
+        <ArrowLeft className="h-3.5 w-3.5" /> Volver a agentes
+      </Link>
+
       {/* Header */}
       <div className="flex items-center gap-4">
         <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-blue-50">

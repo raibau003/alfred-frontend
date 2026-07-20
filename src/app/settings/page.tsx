@@ -23,6 +23,21 @@ export default function SettingsPage() {
   const [waQr, setWaQr] = useState<string | null>(null);
   const [waPhone, setWaPhone] = useState<string | null>(null);
 
+  // WhatsApp settings (persisted)
+  const [waSettings, setWaSettings] = useState({
+    allowOthers: true,
+    groupTag: "@alfred",
+    autoRespond: true,
+    scheduleStart: "08:00",
+    scheduleEnd: "22:00",
+    readOnly: false,
+    forwardUnknown: true,
+    responseStyle: "normal",
+    language: "es",
+  });
+  const [waSettingsChanged, setWaSettingsChanged] = useState(false);
+  const [waSettingsSaved, setWaSettingsSaved] = useState(false);
+
   // Telegram state
   const [tgBotToken, setTgBotToken] = useState("");
   const [tgConnected, setTgConnected] = useState(false);
@@ -41,6 +56,13 @@ export default function SettingsPage() {
       const active = data.bridges?.some((b: { token: string }) => b.token.startsWith(`bridge_${user.id.substring(0, 8)}`));
       setBridgeActive(!!active);
     }).catch(() => {});
+
+    // Load channel settings
+    supabase.from("channel_settings").select("*").eq("user_id", user.id).single().then(({ data }) => {
+      if (data?.whatsapp) {
+        setWaSettings(prev => ({ ...prev, ...data.whatsapp }));
+      }
+    });
 
     // Check WhatsApp status
     checkWhatsAppStatus();
@@ -80,6 +102,25 @@ export default function SettingsPage() {
     await supabase.from("profiles").upsert({ id: user.id, name, phone });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const updateWaSetting = (key: string, value: any) => {
+    setWaSettings(prev => ({ ...prev, [key]: value }));
+    setWaSettingsChanged(true);
+    setWaSettingsSaved(false);
+  };
+
+  const saveWaSettings = async () => {
+    if (!user) return;
+    const supabase = createClient();
+    await supabase.from("channel_settings").upsert({
+      user_id: user.id,
+      whatsapp: waSettings,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+    setWaSettingsChanged(false);
+    setWaSettingsSaved(true);
+    setTimeout(() => setWaSettingsSaved(false), 2000);
   };
 
   const copyToken = () => {
@@ -182,87 +223,77 @@ export default function SettingsPage() {
               <div className="border-t border-slate-200 pt-3 mt-3 space-y-3">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Configuracion avanzada</p>
 
-                {/* Allow others to talk */}
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-slate-700">Permitir que otros me hablen</p>
-                    <p className="text-[10px] text-slate-400">Si desactivas, solo tu puedes hablarle a Alfred</p>
-                  </div>
-                  <button className="relative inline-flex h-5 w-9 items-center rounded-full bg-green-600 transition-colors">
-                    <span className="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow translate-x-4" />
+                  <div><p className="text-xs text-slate-700">Permitir que otros me hablen</p><p className="text-[10px] text-slate-400">Si desactivas, solo tu puedes hablarle a Alfred</p></div>
+                  <button onClick={() => updateWaSetting("allowOthers", !waSettings.allowOthers)} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${waSettings.allowOthers ? "bg-green-600" : "bg-slate-300"}`}>
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${waSettings.allowOthers ? "translate-x-4" : "translate-x-0.5"}`} />
                   </button>
                 </div>
 
-                {/* Tag in groups */}
                 <div>
                   <p className="text-xs text-slate-700">Tag para grupos</p>
                   <p className="text-[10px] text-slate-400 mb-1">En grupos, Alfred solo responde si lo mencionan con este tag</p>
-                  <input className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs" defaultValue="@alfred" />
+                  <input value={waSettings.groupTag} onChange={(e) => updateWaSetting("groupTag", e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs" />
                 </div>
 
-                {/* Auto-respond or manual */}
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-slate-700">Respuesta automatica</p>
-                    <p className="text-[10px] text-slate-400">Si desactivas, Alfred espera tu confirmacion antes de responder</p>
-                  </div>
-                  <button className="relative inline-flex h-5 w-9 items-center rounded-full bg-green-600 transition-colors">
-                    <span className="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow translate-x-4" />
+                  <div><p className="text-xs text-slate-700">Respuesta automatica</p><p className="text-[10px] text-slate-400">Si desactivas, Alfred espera tu confirmacion antes de responder</p></div>
+                  <button onClick={() => updateWaSetting("autoRespond", !waSettings.autoRespond)} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${waSettings.autoRespond ? "bg-green-600" : "bg-slate-300"}`}>
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${waSettings.autoRespond ? "translate-x-4" : "translate-x-0.5"}`} />
                   </button>
                 </div>
 
-                {/* Schedule */}
                 <div>
                   <p className="text-xs text-slate-700">Horario de atencion</p>
                   <p className="text-[10px] text-slate-400 mb-1">Fuera de este horario, Alfred envia respuesta automatica</p>
                   <div className="flex items-center gap-2">
-                    <input type="time" className="rounded-md border border-slate-300 px-2 py-1 text-xs" defaultValue="08:00" />
+                    <input type="time" value={waSettings.scheduleStart} onChange={(e) => updateWaSetting("scheduleStart", e.target.value)} className="rounded-md border border-slate-300 px-2 py-1 text-xs" />
                     <span className="text-xs text-slate-400">a</span>
-                    <input type="time" className="rounded-md border border-slate-300 px-2 py-1 text-xs" defaultValue="22:00" />
+                    <input type="time" value={waSettings.scheduleEnd} onChange={(e) => updateWaSetting("scheduleEnd", e.target.value)} className="rounded-md border border-slate-300 px-2 py-1 text-xs" />
                   </div>
                 </div>
 
-                {/* Read-only mode */}
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-slate-700">Modo solo lectura</p>
-                    <p className="text-[10px] text-slate-400">Alfred lee chats pero no responde (monitoreo)</p>
-                  </div>
-                  <button className="relative inline-flex h-5 w-9 items-center rounded-full bg-slate-300 transition-colors">
-                    <span className="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow translate-x-0.5" />
+                  <div><p className="text-xs text-slate-700">Modo solo lectura</p><p className="text-[10px] text-slate-400">Alfred lee chats pero no responde (monitoreo)</p></div>
+                  <button onClick={() => updateWaSetting("readOnly", !waSettings.readOnly)} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${waSettings.readOnly ? "bg-green-600" : "bg-slate-300"}`}>
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${waSettings.readOnly ? "translate-x-4" : "translate-x-0.5"}`} />
                   </button>
                 </div>
 
-                {/* Forward unknown to owner */}
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-slate-700">Reenviar desconocidos</p>
-                    <p className="text-[10px] text-slate-400">Si alguien pregunta algo que no sabe, te reenvia la pregunta</p>
-                  </div>
-                  <button className="relative inline-flex h-5 w-9 items-center rounded-full bg-green-600 transition-colors">
-                    <span className="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow translate-x-4" />
+                  <div><p className="text-xs text-slate-700">Reenviar desconocidos</p><p className="text-[10px] text-slate-400">Si alguien pregunta algo que no sabe, te reenvia la pregunta</p></div>
+                  <button onClick={() => updateWaSetting("forwardUnknown", !waSettings.forwardUnknown)} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${waSettings.forwardUnknown ? "bg-green-600" : "bg-slate-300"}`}>
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${waSettings.forwardUnknown ? "translate-x-4" : "translate-x-0.5"}`} />
                   </button>
                 </div>
 
-                {/* Response style */}
                 <div>
                   <p className="text-xs text-slate-700">Estilo de respuesta</p>
-                  <select className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs mt-1">
+                  <select value={waSettings.responseStyle} onChange={(e) => updateWaSetting("responseStyle", e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs mt-1">
                     <option value="conciso">Conciso (1-2 oraciones)</option>
-                    <option value="normal" selected>Normal</option>
+                    <option value="normal">Normal</option>
                     <option value="detallado">Detallado (con explicaciones)</option>
                   </select>
                 </div>
 
-                {/* Language */}
                 <div>
                   <p className="text-xs text-slate-700">Idioma</p>
-                  <select className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs mt-1">
-                    <option value="es" selected>Espanol</option>
+                  <select value={waSettings.language} onChange={(e) => updateWaSetting("language", e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs mt-1">
+                    <option value="es">Espanol</option>
                     <option value="en">English</option>
                     <option value="auto">Auto-detectar</option>
                   </select>
                 </div>
+
+                {/* Save button — only shows when there are changes */}
+                {waSettingsChanged && (
+                  <button onClick={saveWaSettings} className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
+                    Guardar cambios
+                  </button>
+                )}
+                {waSettingsSaved && (
+                  <p className="text-center text-xs text-green-600 font-medium">Guardado!</p>
+                )}
               </div>
             )}
           </div>
