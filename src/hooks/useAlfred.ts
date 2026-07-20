@@ -20,6 +20,7 @@ export function useAlfred(threadId?: string) {
   const [busy, setBusy] = useState(false);
   const [connected, setConnected] = useState(false);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(threadId ?? null);
+  const threadIdRef = useRef<string | null>(threadId ?? null);
   const sessionRef = useRef<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const seenTextsRef = useRef<Set<string>>(new Set());
@@ -68,7 +69,7 @@ export function useAlfred(threadId?: string) {
     async (role: "user" | "assistant", content: string, agent?: string) => {
       if (!user) return;
       const supabase = createClient();
-      let tid = currentThreadId;
+      let tid = threadIdRef.current;
       if (!tid) {
         const { data } = await supabase
           .from("conversation_threads")
@@ -77,6 +78,7 @@ export function useAlfred(threadId?: string) {
           .single();
         if (data) {
           tid = data.id;
+          threadIdRef.current = tid;
           setCurrentThreadId(tid);
         }
       }
@@ -88,7 +90,7 @@ export function useAlfred(threadId?: string) {
         agent: agent ?? null,
       });
     },
-    [user, currentThreadId]
+    [user]
   );
 
   // Simple polling: show ALL new assistant messages as they appear
@@ -194,6 +196,7 @@ export function useAlfred(threadId?: string) {
   const newThread = useCallback(() => {
     setMessages([]);
     setCurrentThreadId(null);
+    threadIdRef.current = null;
     sessionRef.current = null;
     seenTextsRef.current.clear();
     if (pollRef.current) clearInterval(pollRef.current);
