@@ -144,7 +144,12 @@ export function useAlfred(threadId?: string) {
             });
           }
 
-          // Check stability
+          // Check for real (non-progress) response on EVERY poll
+          const assistantMsgs = msgs.filter(m => m.role === "assistant");
+          const isProgress = (t: string) => t.endsWith("...") || t.includes("% (~") || t.includes("restantes)") || /^\s*(buscando|revisando|consultando|ejecutando|procesando|trabajando|alfred sigue)/i.test(t);
+          const hasRealResponse = assistantMsgs.some(m => m.text.length > 30 && !isProgress(m.text));
+
+          // Track stability for timeout
           if (msgs.length === lastMsgCount && msgs.length > 0) {
             stablePolls++;
           } else {
@@ -152,22 +157,16 @@ export function useAlfred(threadId?: string) {
             lastMsgCount = msgs.length;
           }
 
-          // After 5 stable polls (10s) check for real response
-          if (stablePolls >= 5) {
-            const assistantMsgs = msgs.filter(m => m.role === "assistant");
-            const isProgress = (t: string) => t.endsWith("...") || t.includes("% (~") || t.includes("restantes)") || /^\s*(buscando|revisando|consultando|ejecutando|procesando|trabajando|alfred sigue)/i.test(t);
-            const hasRealResponse = assistantMsgs.some(m => m.text.length > 30 && !isProgress(m.text));
-
-            if (hasRealResponse) {
-              foundFinal = true;
-              if (pollRef.current) clearInterval(pollRef.current);
-              setBusy(false);
-              // Remove heartbeats
-              setMessages(prev => prev.filter(m => !m.id.startsWith("hb-")));
-              // Save the final response
-              const lastReal = assistantMsgs.filter(m => m.text.length > 30 && !isProgress(m.text)).pop();
-              if (lastReal) saveMessage("assistant", lastReal.text, lastReal.agent);
-            }
+          // Finish if we have a real response AND it's been stable for at least 2 polls (4s)
+          if (hasRealResponse && stablePolls >= 2) {
+            foundFinal = true;
+            if (pollRef.current) clearInterval(pollRef.current);
+            setBusy(false);
+            // Remove heartbeats
+            setMessages(prev => prev.filter(m => !m.id.startsWith("hb-")));
+            // Save the final response
+            const lastReal = assistantMsgs.filter(m => m.text.length > 30 && !isProgress(m.text)).pop();
+            if (lastReal) saveMessage("assistant", lastReal.text, lastReal.agent);
           }
 
           // Safety: after 5 min of polling, stop
