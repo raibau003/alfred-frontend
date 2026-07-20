@@ -4,14 +4,15 @@ export interface AlfredMessage {
   role: "user" | "assistant";
   text: string;
   agent?: string;
+  rich?: { type: string; products?: any[]; actions?: any[]; [key: string]: any };
 }
 
-export async function createSession(title: string): Promise<string | null> {
+export async function createSession(title: string, userId?: string): Promise<string | null> {
   try {
     const resp = await fetch(`${ROUTER_URL}/session`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ directory: "/home/agent/sandbox", title }),
+      body: JSON.stringify({ directory: "/home/agent/sandbox", title, user_id: userId }),
     });
     const data = await resp.json();
     return data?.id ?? null;
@@ -41,27 +42,24 @@ export async function getMessages(sessionId: string): Promise<AlfredMessage[]> {
     for (const msg of messages) {
       const role = (msg.role || msg.info?.role) as "user" | "assistant";
       if (!role) continue;
+
+      let text = "";
+      let rich: any = null;
+
       for (const p of (msg.parts || [])) {
-        if (p.type === "text" && p.text) {
-          result.push({ role, text: p.text });
+        if (p.type === "text" && p.text) text = p.text;
+        if (p.type === "rich" && p.richType) {
+          rich = { type: p.richType, ...p.data };
         }
+      }
+
+      if (text) {
+        result.push({ role, text, rich: rich || undefined });
       }
     }
     return result;
   } catch {
     return [];
-  }
-}
-
-export async function getSessionStatus(sessionId: string): Promise<"processing" | "done" | "error"> {
-  try {
-    const resp = await fetch(`${ROUTER_URL}/session/${sessionId}/message?directory=/home/agent/sandbox`);
-    if (!resp.ok) return "error";
-    // Check if router is still processing by looking at the session
-    // The router sets status = "done" when finished
-    return "done"; // We'll check via polling in the hook
-  } catch {
-    return "error";
   }
 }
 

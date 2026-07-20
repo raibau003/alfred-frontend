@@ -5,6 +5,8 @@ import { Send, PanelLeftOpen, Plus } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatMessage } from "@/hooks/useAlfred";
+import { ProductCards } from "./rich/ProductCards";
+import { ActionButtons } from "./rich/ActionButtons";
 
 interface Props {
   messages: ChatMessage[];
@@ -155,6 +157,18 @@ export function ChatView({ messages, busy, connected, onSend, userName, onToggle
                     <p className="whitespace-pre-wrap">{msg.content}</p>
                   )}
                 </div>
+
+                {/* Rich content */}
+                {msg.rich && msg.role === "assistant" && (
+                  <>
+                    {msg.rich.type === "product_list" && msg.rich.products && (
+                      <ProductCards products={msg.rich.products} onAction={onSend} />
+                    )}
+                    {msg.rich.type === "action_buttons" && msg.rich.actions && (
+                      <ActionButtons actions={msg.rich.actions} onAction={onSend} />
+                    )}
+                  </>
+                )}
 
                 <span className="text-[9px] text-slate-300 mt-0.5 block px-1">
                   {msg.timestamp.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}

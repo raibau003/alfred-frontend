@@ -11,6 +11,7 @@ export interface ChatMessage {
   content: string;
   agent?: string;
   timestamp: Date;
+  rich?: { type: string; products?: any[]; actions?: any[]; [key: string]: any };
 }
 
 export function useAlfred(threadId?: string) {
@@ -50,7 +51,7 @@ export function useAlfred(threadId?: string) {
   // Initialize Router session
   const initSession = useCallback(async () => {
     if (sessionRef.current) return;
-    const sid = await createSession(`Web ${user?.email ?? "user"}`);
+    const sid = await createSession(`Web ${user?.email ?? "user"}`, user?.id);
     if (sid) {
       sessionRef.current = sid;
       setConnected(true);
@@ -127,6 +128,7 @@ export function useAlfred(threadId?: string) {
                 content: am.text,
                 agent: am.agent,
                 timestamp: new Date(),
+                rich: am.rich || undefined,
               };
               setMessages((prev) => {
                 // Avoid duplicates
