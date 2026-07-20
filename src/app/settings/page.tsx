@@ -214,10 +214,24 @@ export default function SettingsPage() {
             </div>
 
             {waStatus === "connected" && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-green-700">Numero: +{waPhone}</span>
-                <button onClick={checkWhatsAppStatus} className="text-xs text-green-600 hover:underline flex items-center gap-1">
-                  <RefreshCw className="h-3 w-3" /> Verificar
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-green-700">Numero: +{waPhone}</span>
+                  <button onClick={checkWhatsAppStatus} className="text-xs text-green-600 hover:underline flex items-center gap-1">
+                    <RefreshCw className="h-3 w-3" /> Verificar
+                  </button>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      await fetch(`${WAHA_PUBLIC_URL}/api/sessions/default/auth/logout`, { method: "POST", headers: { "X-Api-Key": "none" } });
+                    } catch {}
+                    setWaStatus("disconnected");
+                    setWaPhone(null);
+                  }}
+                  className="text-xs text-red-500 hover:underline"
+                >
+                  Desconectar
                 </button>
               </div>
             )}
@@ -236,9 +250,12 @@ export default function SettingsPage() {
                     </div>
                   )}
                 </div>
-                <div className="text-center">
-                  <button onClick={checkWhatsAppStatus} className="text-xs text-[#0a1628] hover:underline flex items-center gap-1 mx-auto">
-                    <RefreshCw className="h-3 w-3" /> Ya escanee, verificar conexion
+                <div className="flex justify-center gap-3">
+                  <button onClick={checkWhatsAppStatus} className="text-xs text-[#0a1628] hover:underline flex items-center gap-1">
+                    <RefreshCw className="h-3 w-3" /> Ya escanee, verificar
+                  </button>
+                  <button onClick={() => { setWaQr(null); checkWhatsAppStatus(); }} className="text-xs text-[#e8864a] hover:underline flex items-center gap-1">
+                    <QrCode className="h-3 w-3" /> Regenerar QR
                   </button>
                 </div>
               </div>
@@ -366,8 +383,20 @@ export default function SettingsPage() {
             </div>
 
             {tgConnected && tgBotName && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between">
                 <span className="text-xs text-[#0a1628]">Bot: @{tgBotName}</span>
+                <button
+                  onClick={async () => {
+                    const supabase = createClient();
+                    if (user) await supabase.from("channel_settings").upsert({ user_id: user.id, telegram: {} }, { onConflict: "user_id" });
+                    setTgConnected(false);
+                    setTgBotName(null);
+                    setTgBotToken("");
+                  }}
+                  className="text-xs text-red-500 hover:underline"
+                >
+                  Desconectar
+                </button>
               </div>
             )}
 
