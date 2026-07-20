@@ -147,9 +147,9 @@ export function useAlfred(threadId?: string) {
 
   const send = useCallback(
     async (text: string) => {
-      if (!sessionRef.current || busy) return;
+      if (!text.trim()) return;
 
-      // Add optimistic user message
+      // Add optimistic user message FIRST (always show what user typed)
       const userMsg: ChatMessage = {
         id: `u-${Date.now()}`,
         role: "user",
@@ -157,6 +157,12 @@ export function useAlfred(threadId?: string) {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, userMsg]);
+
+      // If no session yet, create one
+      if (!sessionRef.current) {
+        await initSession();
+      }
+      if (!sessionRef.current) return; // Still no session — Router might be down
       saveMessage("user", text);
 
       setBusy(true);
