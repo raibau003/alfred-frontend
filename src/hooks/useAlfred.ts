@@ -106,7 +106,7 @@ export function useAlfred(threadId?: string) {
       pollRef.current = setInterval(async () => {
         if (!sessionRef.current || foundFinal) return;
         try {
-          const msgs = await getMessages(sessionRef.current);
+          const { messages: msgs, status } = await getMessages(sessionRef.current);
 
           // Show any new assistant messages
           let hasNew = false;
@@ -144,32 +144,21 @@ export function useAlfred(threadId?: string) {
             });
           }
 
-          // Check for real (non-progress) response on EVERY poll
-          const assistantMsgs = msgs.filter(m => m.role === "assistant");
-          const isProgress = (t: string) => t.endsWith("...") || t.includes("% (~") || t.includes("restantes)") || /^\s*(buscando|revisando|consultando|ejecutando|procesando|trabajando|alfred sigue)/i.test(t);
-          const hasRealResponse = assistantMsgs.some(m => m.text.length > 30 && !isProgress(m.text));
-
-          // Track stability for timeout
-          if (msgs.length === lastMsgCount && msgs.length > 0) {
-            stablePolls++;
-          } else {
-            stablePolls = 0;
-            lastMsgCount = msgs.length;
-          }
-
-          // Finish if we have a real response AND it's been stable for at least 2 polls (4s)
-          if (hasRealResponse && stablePolls >= 2) {
+          // PRIMARY: Router says "done" = we're done
+          if (status === "done") {
             foundFinal = true;
             if (pollRef.current) clearInterval(pollRef.current);
             setBusy(false);
-            // Remove heartbeats
             setMessages(prev => prev.filter(m => !m.id.startsWith("hb-")));
-            // Save the final response
-            const lastReal = assistantMsgs.filter(m => m.text.length > 30 && !isProgress(m.text)).pop();
+            // Save last real response
+            const isProgress = (t: string) => t.endsWith("...") || t.includes("% (~") || t.includes("restantes)") || /^\s*(buscando|revisando|consultando|ejecutando|procesando|trabajando|alfred sigue)/i.test(t);
+            const lastReal = msgs.filter(m => m.role === "assistant" && m.text.length > 30 && !isProgress(m.text)).pop();
             if (lastReal) saveMessage("assistant", lastReal.text, lastReal.agent);
+            return;
           }
 
           // Safety: after 5 min of polling, stop
+          stablePolls++;
           if (stablePolls > 150) {
             if (pollRef.current) clearInterval(pollRef.current);
             setBusy(false);

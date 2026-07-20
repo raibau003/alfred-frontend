@@ -32,14 +32,17 @@ export async function sendPrompt(sessionId: string, text: string): Promise<void>
   });
 }
 
-export async function getMessages(sessionId: string): Promise<AlfredMessage[]> {
+export async function getMessages(sessionId: string): Promise<{ messages: AlfredMessage[]; status: string }> {
   try {
     const resp = await fetch(`${ROUTER_URL}/session/${sessionId}/message?directory=/home/agent/sandbox`);
-    const messages = await resp.json();
-    if (!Array.isArray(messages)) return [];
+    const data = await resp.json();
+
+    // Support both old format (array) and new format ({ messages, status })
+    const rawMessages = Array.isArray(data) ? data : (data.messages || []);
+    const status = Array.isArray(data) ? "unknown" : (data.status || "unknown");
 
     const result: AlfredMessage[] = [];
-    for (const msg of messages) {
+    for (const msg of rawMessages) {
       const role = (msg.role || msg.info?.role) as "user" | "assistant";
       if (!role) continue;
 
@@ -57,9 +60,9 @@ export async function getMessages(sessionId: string): Promise<AlfredMessage[]> {
         result.push({ role, text, rich: rich || undefined });
       }
     }
-    return result;
+    return { messages: result, status };
   } catch {
-    return [];
+    return { messages: [], status: "error" };
   }
 }
 
