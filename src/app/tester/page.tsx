@@ -128,7 +128,7 @@ export default function TesterDashboard() {
 
       // Save to Supabase
       await supabase.from("test_runs").insert({
-        test_type: "agent",
+        test_type: "frontend",
         agent_name: selectedAgent,
         prompt,
         actual_response: response.substring(0, 2000),
