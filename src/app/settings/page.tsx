@@ -320,15 +320,18 @@ export default function SettingsPage() {
                   </select>
                 </div>
 
-                {/* Save button — only shows when there are changes */}
-                {waSettingsChanged && (
-                  <button onClick={saveWaSettings} className="w-full rounded-lg bg-[#0a1628] px-4 py-2 text-sm font-medium text-white hover:bg-[#1e3a5f] transition-colors">
-                    Guardar cambios
-                  </button>
-                )}
-                {waSettingsSaved && (
-                  <p className="text-center text-xs text-green-600 font-medium">Guardado!</p>
-                )}
+                {/* Save button */}
+                <button
+                  onClick={saveWaSettings}
+                  disabled={!waSettingsChanged}
+                  className={`w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                    waSettingsChanged
+                      ? "bg-[#e8864a] text-white hover:bg-[#d4722e]"
+                      : "bg-slate-100 text-slate-400 cursor-default"
+                  }`}
+                >
+                  {waSettingsSaved ? "Guardado!" : waSettingsChanged ? "Guardar cambios" : "Sin cambios"}
+                </button>
               </div>
             )}
           </div>
