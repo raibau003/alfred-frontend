@@ -64,10 +64,9 @@ export default function SettingsPage() {
     };
     checkBridge();
     const bridgeInterval = setInterval(checkBridge, 10000);
-    return () => clearInterval(bridgeInterval);
 
     // Load channel settings
-    supabase.from("channel_settings").select("*").eq("user_id", user.id).single().then(({ data }) => {
+    supabase.from("channel_settings").select("*").eq("user_id", user!.id).single().then(({ data }) => {
       if (data?.whatsapp) {
         setWaSettings(prev => ({ ...prev, ...data.whatsapp }));
       }
@@ -79,6 +78,7 @@ export default function SettingsPage() {
 
     // Check WhatsApp status
     checkWhatsAppStatus();
+    return () => clearInterval(bridgeInterval);
   }, [user]);
 
   const checkWhatsAppStatus = useCallback(async () => {
