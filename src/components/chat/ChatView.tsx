@@ -202,6 +202,15 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
                       })()}
                       {/* Regular markdown content (if no progress bar) */}
                       {!msg.content.match(/\d+%.*restantes/) && (() => {
+                        // Skip inline product parsing if rich content already provides products
+                        if (msg.rich?.type === "product_list" && msg.rich?.products?.length > 0) {
+                          const cleanContent = msg.content.replace(/```json[\s\S]*?```/g, "").trim();
+                          return (
+                            <div className="prose prose-sm prose-slate max-w-none [&_table]:text-xs [&_th]:px-2 [&_td]:px-2 [&_h2]:text-sm [&_h3]:text-sm [&_p]:my-1">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanContent}</ReactMarkdown>
+                            </div>
+                          );
+                        }
                         // Try to extract products from response (JSON or markdown table)
                         let products: any[] = [];
                         let cleanContent = msg.content;
