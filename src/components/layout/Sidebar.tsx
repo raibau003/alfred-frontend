@@ -13,6 +13,7 @@ import {
   Wifi,
   WifiOff,
   Loader2,
+  FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -23,6 +24,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/agents", label: "Agentes", icon: Bot },
   { href: "/connectors", label: "Conectores", icon: Plug },
+  { href: "/tester", label: "Tester", icon: FlaskConical },
   { href: "/settings", label: "Configuracion", icon: Settings },
 ];
 
