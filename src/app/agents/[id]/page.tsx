@@ -195,17 +195,54 @@ export default function AgentDetailPage() {
           </h2>
           {artifacts.length > 0 ? (
             <div className="space-y-2">
-              {artifacts.map((a, i) => (
-                <div key={i} className="flex items-center justify-between rounded-lg border border-slate-200 p-3 hover:bg-slate-50">
-                  <div>
-                    <p className="text-xs font-medium text-slate-900">{a.prompt?.substring(0, 50)}</p>
-                    <p className="text-[10px] text-slate-400">{new Date(a.created_at).toLocaleDateString("es-CL")} — {a.channel}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] text-slate-500">{a.response ? `${a.response.length} chars` : "Sin respuesta"}</p>
-                  </div>
-                </div>
-              ))}
+              {artifacts.map((a, i) => {
+                const resp = a.response || "";
+                return (
+                  <details key={i} className="group rounded-lg border border-slate-200 overflow-hidden">
+                    <summary className="flex items-center justify-between w-full p-3 hover:bg-slate-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400 group-open:rotate-90 transition-transform text-xs">▶</span>
+                        <FileText className="h-3.5 w-3.5 text-slate-400" />
+                        <div>
+                          <p className="text-xs font-medium text-slate-900">{a.prompt?.substring(0, 50)}</p>
+                          <p className="text-[10px] text-slate-400">{new Date(a.created_at).toLocaleDateString("es-CL")} — {a.channel}</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-slate-400">{resp.length} chars</span>
+                    </summary>
+                    {resp && (
+                      <div className="border-t border-slate-100 p-3 bg-slate-50 space-y-2">
+                        <div className="max-h-60 overflow-y-auto rounded-lg bg-white border border-slate-100 p-3 text-xs text-slate-700 whitespace-pre-wrap font-mono">
+                          {resp.substring(0, 2000)}
+                          {resp.length > 2000 && <span className="text-slate-400">... ({resp.length - 2000} mas)</span>}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              const blob = new Blob([resp], { type: "text/plain" });
+                              const url = URL.createObjectURL(blob);
+                              const link = document.createElement("a");
+                              link.href = url;
+                              link.download = `alfred-${agent?.name || "artifact"}-${i}.txt`;
+                              link.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                            className="flex items-center gap-1 rounded-md bg-[#0a1628] px-3 py-1.5 text-[10px] text-white hover:bg-[#1e3a5f]"
+                          >
+                            <Download className="h-3 w-3" /> Descargar
+                          </button>
+                          <button
+                            onClick={() => navigator.clipboard.writeText(resp)}
+                            className="flex items-center gap-1 rounded-md border border-slate-200 px-3 py-1.5 text-[10px] text-slate-600 hover:bg-white"
+                          >
+                            <Check className="h-3 w-3" /> Copiar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </details>
+                );
+              })}
             </div>
           ) : (
             <p className="py-4 text-center text-xs text-slate-400">Sin artefactos. Habla con este agente para generar resultados.</p>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { Send, PanelLeftOpen, Plus } from "lucide-react";
+import { Send, PanelLeftOpen, Plus, Square, Copy, Check, Share2, ThumbsUp, ThumbsDown, Mic, Paperclip, Search } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatMessage } from "@/hooks/useAlfred";
@@ -18,14 +18,17 @@ interface Props {
   busy: boolean;
   connected: boolean;
   onSend: (text: string) => void;
+  onStop?: () => void;
   userName: string;
   onToggleThreads?: () => void;
   showThreadsButton?: boolean;
   shoppingMode?: boolean;
 }
 
-export function ChatView({ messages, busy, connected, onSend, userName, onToggleThreads, showThreadsButton, shoppingMode }: Props) {
+export function ChatView({ messages, busy, connected, onSend, onStop, userName, onToggleThreads, showThreadsButton, shoppingMode }: Props) {
   const [input, setInput] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [reactions, setReactions] = useState<Record<string, "up" | "down">>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -37,9 +40,19 @@ export function ChatView({ messages, busy, connected, onSend, userName, onToggle
     inputRef.current?.focus();
   }, []);
 
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const toggleReaction = (id: string, type: "up" | "down") => {
+    setReactions(prev => prev[id] === type ? { ...prev, [id]: undefined as any } : { ...prev, [id]: type });
+  };
+
   const handleSend = () => {
     const text = input.trim();
-    if (!text || busy) return;
+    if (!text) return;
     onSend(text);
     setInput("");
   };
@@ -286,9 +299,28 @@ export function ChatView({ messages, busy, connected, onSend, userName, onToggle
                   </>
                 )}
 
-                <span className="text-[9px] text-slate-300 mt-0.5 block px-1">
-                  {msg.timestamp.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}
-                </span>
+                {/* Actions row — copy, reactions, share */}
+                {msg.role === "assistant" && msg.content.length > 30 && !msg.content.includes("% (~") && (
+                  <div className="flex items-center gap-1 mt-1 px-1">
+                    <button onClick={() => copyToClipboard(msg.content, msg.id)} className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500" title="Copiar">
+                      {copiedId === msg.id ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                    </button>
+                    <button onClick={() => toggleReaction(msg.id, "up")} className={`p-1 rounded hover:bg-slate-100 ${reactions[msg.id] === "up" ? "text-green-500" : "text-slate-300 hover:text-slate-500"}`} title="Util">
+                      <ThumbsUp className="h-3 w-3" />
+                    </button>
+                    <button onClick={() => toggleReaction(msg.id, "down")} className={`p-1 rounded hover:bg-slate-100 ${reactions[msg.id] === "down" ? "text-red-500" : "text-slate-300 hover:text-slate-500"}`} title="No util">
+                      <ThumbsDown className="h-3 w-3" />
+                    </button>
+                    <span className="text-[9px] text-slate-300 ml-1">
+                      {msg.timestamp.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                )}
+                {msg.role === "user" && (
+                  <span className="text-[9px] text-slate-300 mt-0.5 block px-1">
+                    {msg.timestamp.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                )}
               </div>
             </div>
           ))}
@@ -296,12 +328,31 @@ export function ChatView({ messages, busy, connected, onSend, userName, onToggle
           {busy && (
             <div className="flex justify-start">
               <div className="rounded-2xl bg-slate-100 px-4 py-3">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="h-2 w-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="h-2 w-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-[#e8864a] animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="h-2 w-2 rounded-full bg-[#e8864a] animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="h-2 w-2 rounded-full bg-[#e8864a] animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </div>
+                  <span className="text-[10px] text-slate-400">Alfred esta trabajando...</span>
+                  {onStop && (
+                    <button onClick={onStop} className="flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] text-red-600 hover:bg-red-100">
+                      <Square className="h-2.5 w-2.5 fill-red-600" /> Detener
+                    </button>
+                  )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Follow-up suggestions after last response */}
+          {!busy && messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && !messages[messages.length - 1]?.content.includes("% (~") && messages[messages.length - 1]?.content.length > 50 && (
+            <div className="flex flex-wrap gap-1.5 mt-2 px-1">
+              {["Dame mas detalles", "Que mas puedes hacer con esto?", "Busca alternativas"].map(q => (
+                <button key={q} onClick={() => onSend(q)} className="rounded-full border border-slate-200 px-3 py-1 text-[10px] text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition-colors">
+                  {q}
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -321,15 +372,29 @@ export function ChatView({ messages, busy, connected, onSend, userName, onToggle
               className="flex-1 resize-none bg-transparent text-sm text-slate-900 placeholder-slate-400 focus:outline-none"
               style={{ maxHeight: "120px" }}
             />
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || busy || !connected}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#0a1628] text-white hover:bg-slate-800 disabled:opacity-30 transition-colors"
-            >
-              <Send className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              <button className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" title="Adjuntar archivo">
+                <Paperclip className="h-4 w-4" />
+              </button>
+              <button className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:text-[#e8864a] hover:bg-orange-50 transition-colors" title="Mensaje de voz">
+                <Mic className="h-4 w-4" />
+              </button>
+              <button
+                onClick={handleSend}
+                disabled={!input.trim() || !connected}
+                className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#0a1628] text-white hover:bg-[#1e3a5f] disabled:opacity-30 transition-colors"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-          <p className="text-center text-[9px] text-slate-300 mt-1.5">Alfred puede cometer errores. Verifica la informacion importante.</p>
+          <div className="flex items-center justify-between mt-1.5 px-1">
+            <p className="text-[9px] text-slate-300">Alfred puede cometer errores. Verifica la informacion importante.</p>
+            <div className="flex items-center gap-2 text-[9px] text-slate-300">
+              <span>⌘K buscar</span>
+              <span>⌘N nuevo</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
