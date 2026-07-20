@@ -180,8 +180,14 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* User */}
+      {/* Dark mode toggle + User */}
       <div className="border-t border-surface-4 p-3 space-y-1.5">
+        <button
+          onClick={() => document.documentElement.classList.toggle("dark")}
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-slate-400 hover:bg-surface-3 transition-colors"
+        >
+          🌙 Modo oscuro
+        </button>
         <div className="flex items-center gap-2 text-xs text-slate-500 px-1">
           <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-[#0a1628] text-[10px] font-bold shrink-0">
             {user?.email?.[0]?.toUpperCase() ?? "U"}

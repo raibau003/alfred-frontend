@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { AuthGate } from "@/components/auth/AuthGate";
+import { Onboarding } from "@/components/Onboarding";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -25,6 +26,7 @@ export default function RootLayout({
         <AuthProvider>
           <TooltipProvider>
             <AuthGate>{children}</AuthGate>
+            <Onboarding />
           </TooltipProvider>
           <Toaster
             position="bottom-right"
