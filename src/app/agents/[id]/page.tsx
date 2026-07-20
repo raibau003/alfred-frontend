@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Bot, Plug, Package, Plus, Trash2, Search, Sparkles, Download, Check, ArrowLeft } from "lucide-react";
+import { Bot, Plug, Package, Plus, Trash2, Search, Sparkles, Download, Check, ArrowLeft, MessageSquare, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useAlfred } from "@/hooks/useAlfred";
+import { ChatView } from "@/components/chat/ChatView";
 import type { Agent, Connector } from "@/lib/supabase/types";
 
 interface MarketplaceSkill {
@@ -41,6 +43,9 @@ export default function AgentDetailPage() {
   const [marketplaceSkills, setMarketplaceSkills] = useState<MarketplaceSkill[]>([]);
   const [showMarketplace, setShowMarketplace] = useState(false);
   const [installedSlugs, setInstalledSlugs] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<"info" | "chat" | "artifacts">("info");
+  const [artifacts, setArtifacts] = useState<any[]>([]);
+  const alfred = useAlfred();
 
   useEffect(() => {
     const supabase = createClient();
@@ -53,6 +58,10 @@ export default function AgentDetailPage() {
     if (user) {
       supabase.from("connectors").select("*").eq("agent_id", id).eq("user_id", user.id).then(({ data }) => {
         if (data) setConnectors(data as Connector[]);
+      });
+      // Load artifacts for this agent
+      supabase.from("conversations").select("*").eq("agent", id).order("created_at", { ascending: false }).limit(20).then(({ data }) => {
+        if (data) setArtifacts(data);
       });
     }
   }, [id, user]);
@@ -121,17 +130,20 @@ export default function AgentDetailPage() {
 
   if (!agent) return <div className="p-8 text-slate-400">Cargando...</div>;
 
-  return (
-    <div className="max-w-3xl space-y-6">
-      {/* Back button */}
-      <Link href="/agents" className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 transition-colors">
-        <ArrowLeft className="h-3.5 w-3.5" /> Volver a agentes
-      </Link>
+  // Send message prefixed with agent context so Router knows which agent to use
+  const sendToAgent = (text: string) => {
+    alfred.send(`[para ${agent?.name || id}]: ${text}`);
+  };
 
-      {/* Header */}
+  return (
+    <div className="space-y-4">
+      {/* Back + Header */}
       <div className="flex items-center gap-4">
-        <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-blue-50">
-          <Bot className="h-7 w-7 text-blue-600" />
+        <Link href="/agents" className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400">
+          <ArrowLeft className="h-4 w-4" />
+        </Link>
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
+          <Bot className="h-5 w-5 text-blue-600" />
         </div>
         <div>
           <h1 className="text-xl font-semibold text-slate-900">{agent.name}</h1>
@@ -143,6 +155,66 @@ export default function AgentDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-slate-200">
+        {[
+          { id: "chat" as const, label: "Chat", icon: MessageSquare },
+          { id: "info" as const, label: "Configuracion", icon: Plug },
+          { id: "artifacts" as const, label: "Artefactos", icon: FileText },
+        ].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm border-b-2 transition-colors ${activeTab === t.id ? "border-blue-600 text-blue-700 font-medium" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+          >
+            <t.icon className="h-3.5 w-3.5" /> {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Chat tab */}
+      {activeTab === "chat" && (
+        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden" style={{ height: "500px" }}>
+          <ChatView
+            messages={alfred.messages}
+            busy={alfred.busy}
+            connected={alfred.connected}
+            onSend={sendToAgent}
+            userName={user?.email?.split("@")[0] ?? ""}
+          />
+        </div>
+      )}
+
+      {/* Artifacts tab */}
+      {activeTab === "artifacts" && (
+        <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-3">
+          <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <FileText className="h-4 w-4 text-slate-500" />
+            Artefactos ({artifacts.length})
+          </h2>
+          {artifacts.length > 0 ? (
+            <div className="space-y-2">
+              {artifacts.map((a, i) => (
+                <div key={i} className="flex items-center justify-between rounded-lg border border-slate-200 p-3 hover:bg-slate-50">
+                  <div>
+                    <p className="text-xs font-medium text-slate-900">{a.prompt?.substring(0, 50)}</p>
+                    <p className="text-[10px] text-slate-400">{new Date(a.created_at).toLocaleDateString("es-CL")} — {a.channel}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-slate-500">{a.response ? `${a.response.length} chars` : "Sin respuesta"}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="py-4 text-center text-xs text-slate-400">Sin artefactos. Habla con este agente para generar resultados.</p>
+          )}
+        </div>
+      )}
+
+      {/* Info tab — MCPs, Skills, Connectors */}
+      {activeTab === "info" && <>
 
       {/* MCPs */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
@@ -308,6 +380,7 @@ export default function AgentDetailPage() {
           )}
         </div>
       </div>
+      </>}
     </div>
   );
 }
