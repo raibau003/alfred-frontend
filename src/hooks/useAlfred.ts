@@ -95,39 +95,64 @@ export function useAlfred(threadId?: string) {
   const startPolling = useCallback(
     () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      let lastMsgCount = 0;
+      let stablePolls = 0;
+      let foundFinal = false;
 
       pollRef.current = setInterval(async () => {
-        if (!sessionRef.current) return;
-        const msgs = await getMessages(sessionRef.current);
+        if (!sessionRef.current || foundFinal) return;
+        try {
+          const msgs = await getMessages(sessionRef.current);
 
-        // Find assistant messages we haven't shown yet
-        let hasNew = false;
-        for (const msg of msgs) {
-          if (msg.role !== "assistant") continue;
-          if (seenTextsRef.current.has(msg.text)) continue;
+          // Show any new assistant messages
+          for (const msg of msgs) {
+            if (msg.role !== "assistant") continue;
+            if (seenTextsRef.current.has(msg.text)) continue;
+            seenTextsRef.current.add(msg.text);
 
-          seenTextsRef.current.add(msg.text);
-          hasNew = true;
+            setMessages((prev) => [...prev, {
+              id: `a-${Date.now()}-${Math.random()}`,
+              role: "assistant" as const,
+              content: msg.text,
+              agent: msg.agent,
+              timestamp: new Date(),
+              rich: msg.rich || undefined,
+            }]);
+          }
 
-          const chatMsg: ChatMessage = {
-            id: `a-${Date.now()}-${Math.random()}`,
-            role: "assistant",
-            content: msg.text,
-            agent: msg.agent,
-            timestamp: new Date(),
-            rich: msg.rich || undefined,
-          };
-          setMessages((prev) => [...prev, chatMsg]);
+          // Check stability: if message count hasn't changed for 3 polls (6s) = done
+          if (msgs.length === lastMsgCount && msgs.length > 0) {
+            stablePolls++;
+          } else {
+            stablePolls = 0;
+            lastMsgCount = msgs.length;
+          }
 
-          // If it's NOT a progress message, save it
-          const isProgress = /\.\.\.$|^(buscando|revisando|consultando|ejecutando|procesando)/i.test(msg.text.trim());
-          if (!isProgress) {
-            saveMessage("assistant", msg.text, msg.agent);
-            // Final response received — stop polling
+          // After 3 stable polls AND we have at least 1 non-progress assistant message = done
+          if (stablePolls >= 3) {
+            const assistantMsgs = msgs.filter(m => m.role === "assistant");
+            const hasRealResponse = assistantMsgs.some(m =>
+              m.text.length > 30 &&
+              !m.text.endsWith("...") &&
+              !m.text.includes("% (~") &&
+              !m.text.match(/^\s*(buscando|revisando|consultando|ejecutando|procesando)/i)
+            );
+            if (hasRealResponse) {
+              foundFinal = true;
+              if (pollRef.current) clearInterval(pollRef.current);
+              setBusy(false);
+              // Save the final response
+              const lastReal = assistantMsgs.filter(m => m.text.length > 30 && !m.text.endsWith("...")).pop();
+              if (lastReal) saveMessage("assistant", lastReal.text, lastReal.agent);
+            }
+          }
+
+          // Safety: after 5 min of polling, stop
+          if (stablePolls > 150) {
             if (pollRef.current) clearInterval(pollRef.current);
             setBusy(false);
           }
-        }
+        } catch {}
       }, 2000);
     },
     [saveMessage]
