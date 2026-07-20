@@ -41,6 +41,9 @@ export default function SettingsPage() {
   // Telegram state
   const [tgBotToken, setTgBotToken] = useState("");
   const [tgConnected, setTgConnected] = useState(false);
+  const [tgBotName, setTgBotName] = useState<string | null>(null);
+  const [tgConnecting, setTgConnecting] = useState(false);
+  const [tgError, setTgError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -61,6 +64,10 @@ export default function SettingsPage() {
     supabase.from("channel_settings").select("*").eq("user_id", user.id).single().then(({ data }) => {
       if (data?.whatsapp) {
         setWaSettings(prev => ({ ...prev, ...data.whatsapp }));
+      }
+      if (data?.telegram) {
+        const tg = data.telegram as any;
+        if (tg.bot_token) { setTgBotToken(tg.bot_token); setTgConnected(true); setTgBotName(tg.bot_name || null); }
       }
     });
 
@@ -121,6 +128,34 @@ export default function SettingsPage() {
     setWaSettingsChanged(false);
     setWaSettingsSaved(true);
     setTimeout(() => setWaSettingsSaved(false), 2000);
+  };
+
+  const connectTelegram = async () => {
+    if (!tgBotToken.includes(":") || !user) return;
+    setTgConnecting(true);
+    setTgError(null);
+    try {
+      // Validate token with Telegram API
+      const resp = await fetch(`https://api.telegram.org/bot${tgBotToken}/getMe`);
+      const data = await resp.json();
+      if (data.ok && data.result) {
+        const botName = data.result.username;
+        setTgBotName(botName);
+        setTgConnected(true);
+        // Save to Supabase
+        const supabase = createClient();
+        await supabase.from("channel_settings").upsert({
+          user_id: user.id,
+          telegram: { bot_token: tgBotToken, bot_name: botName, bot_id: data.result.id },
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "user_id" });
+      } else {
+        setTgError(data.description || "Token invalido");
+      }
+    } catch {
+      setTgError("No se pudo conectar con Telegram");
+    }
+    setTgConnecting(false);
   };
 
   const copyToken = () => {
@@ -327,24 +362,34 @@ export default function SettingsPage() {
               </ol>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Bot Token</label>
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  value={tgBotToken}
-                  onChange={(e) => setTgBotToken(e.target.value)}
-                  className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                  placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
-                />
-                <button
-                  disabled={!tgBotToken.includes(":")}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-40"
-                >
-                  Conectar
-                </button>
+            {tgConnected && tgBotName && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-blue-700">Bot: @{tgBotName}</span>
               </div>
-            </div>
+            )}
+
+            {!tgConnected && (
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Bot Token</label>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={tgBotToken}
+                    onChange={(e) => { setTgBotToken(e.target.value); setTgError(null); }}
+                    className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+                  />
+                  <button
+                    onClick={connectTelegram}
+                    disabled={!tgBotToken.includes(":") || tgConnecting}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-40"
+                  >
+                    {tgConnecting ? "..." : "Conectar"}
+                  </button>
+                </div>
+                {tgError && <p className="text-xs text-red-500 mt-1">{tgError}</p>}
+              </div>
+            )}
           </div>
 
           {/* Web */}
