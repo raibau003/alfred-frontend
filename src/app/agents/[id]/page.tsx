@@ -142,15 +142,15 @@ export default function AgentDetailPage() {
         <Link href="/agents" className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400">
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
-          <Bot className="h-5 w-5 text-blue-600" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0a1628]/5">
+          <Bot className="h-5 w-5 text-[#0a1628]" />
         </div>
         <div>
           <h1 className="text-xl font-semibold text-slate-900">{agent.name}</h1>
           <p className="text-sm text-slate-400">{agent.description}</p>
           <div className="mt-1 flex items-center gap-2">
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">{agent.id}</span>
-            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600">{agent.category}</span>
+            <span className="rounded-full bg-[#0a1628]/5 px-2 py-0.5 text-[10px] font-medium text-[#0a1628]">{agent.category}</span>
             {agent.is_custom && <span className="rounded-full bg-yellow-50 px-2 py-0.5 text-[10px] font-medium text-yellow-600">Custom</span>}
           </div>
         </div>
@@ -166,7 +166,7 @@ export default function AgentDetailPage() {
           <button
             key={t.id}
             onClick={() => setActiveTab(t.id)}
-            className={`flex items-center gap-1.5 px-4 py-2 text-sm border-b-2 transition-colors ${activeTab === t.id ? "border-blue-600 text-blue-700 font-medium" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm border-b-2 transition-colors ${activeTab === t.id ? "border-[#0a1628] text-[#0a1628] font-medium" : "border-transparent text-slate-500 hover:text-slate-700"}`}
           >
             <t.icon className="h-3.5 w-3.5" /> {t.label}
           </button>
@@ -336,7 +336,7 @@ export default function AgentDetailPage() {
                       className={`shrink-0 ml-3 flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                         installed
                           ? "bg-green-100 text-green-700 cursor-default"
-                          : "bg-blue-600 text-white hover:bg-blue-700"
+                          : "bg-[#0a1628] text-white hover:bg-[#1e3a5f]"
                       }`}
                     >
                       {installed ? <><Check className="h-3 w-3" /> Instalado</> : <><Download className="h-3 w-3" /> Instalar</>}
@@ -375,7 +375,7 @@ export default function AgentDetailPage() {
           ))}
           {connectors.length === 0 && (
             <p className="py-3 text-center text-xs text-slate-400">
-              Sin conectores. <a href="/connectors" className="text-blue-600 hover:underline">Configurar</a>
+              Sin conectores. <a href="/connectors" className="text-[#0a1628] hover:underline">Configurar</a>
             </p>
           )}
         </div>

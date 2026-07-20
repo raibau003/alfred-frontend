@@ -80,7 +80,7 @@ export function ProductCards({ products, onAction }: Props) {
                 </button>
                 <button
                   onClick={() => onAction(`agrega "${p.name}" de ${p.store} a $${p.price} al carro`)}
-                  className="flex-1 flex items-center justify-center gap-0.5 rounded-md bg-blue-600 py-1 text-[9px] text-white hover:bg-blue-700"
+                  className="flex-1 flex items-center justify-center gap-0.5 rounded-md bg-[#0a1628] py-1 text-[9px] text-white hover:bg-[#1e3a5f]"
                 >
                   <ShoppingCart className="h-2.5 w-2.5" /> Agregar
                 </button>
@@ -98,7 +98,7 @@ export function ProductCards({ products, onAction }: Props) {
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => onAction("arma el carro mas barato con todos los productos")}
-          className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs text-blue-700 hover:bg-blue-100"
+          className="flex items-center gap-1 rounded-lg border border-[#0a1628]/20 bg-[#0a1628]/5 px-3 py-1.5 text-xs text-[#0a1628] hover:bg-blue-100"
         >
           ⚡ Lo mas barato de todo
         </button>

@@ -88,7 +88,7 @@ export default function ConnectorsPage() {
         </div>
         <button
           onClick={() => setShowNew(true)}
-          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 rounded-lg bg-[#0a1628] px-4 py-2 text-sm font-medium text-white hover:bg-[#1e3a5f] transition-colors"
         >
           <Plus className="h-4 w-4" />
           Nuevo conector
@@ -97,7 +97,7 @@ export default function ConnectorsPage() {
 
       {/* New connector form */}
       {showNew && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3">
+        <div className="rounded-xl border border-[#0a1628]/20 bg-[#0a1628]/5 p-4 space-y-3">
           <h3 className="text-sm font-semibold text-slate-900">Nuevo conector</h3>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -157,7 +157,7 @@ export default function ConnectorsPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={addConnector} className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-700">
+            <button onClick={addConnector} className="rounded-lg bg-[#0a1628] px-4 py-1.5 text-xs font-medium text-white hover:bg-[#1e3a5f]">
               Guardar
             </button>
             <button onClick={() => setShowNew(false)} className="rounded-lg border border-slate-300 px-4 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">

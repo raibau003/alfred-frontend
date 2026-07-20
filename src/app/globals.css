@@ -5,20 +5,24 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  /* Corporate light palette */
+  /* Alfred Corporate Palette: Azul Oscuro + Blanco + Naranja Suave */
   --color-surface-0: #f8fafc;
   --color-surface-1: #ffffff;
   --color-surface-2: #ffffff;
   --color-surface-3: #f1f5f9;
   --color-surface-4: #e2e8f0;
 
-  --color-brand-400: #60a5fa;
-  --color-brand-500: #3b82f6;
-  --color-brand-600: #2563eb;
-  --color-brand-700: #1d4ed8;
+  --color-brand-400: #1e3a5f;
+  --color-brand-500: #0f2744;
+  --color-brand-600: #0a1628;
+  --color-brand-700: #060e1a;
+
+  --color-accent-400: #f0a06a;
+  --color-accent-500: #e8864a;
+  --color-accent-600: #d4722e;
 
   --color-status-created: #64748b;
-  --color-status-pending: #d97706;
+  --color-status-pending: #e8864a;
   --color-status-running: #16a34a;
   --color-status-restarting: #7c3aed;
   --color-status-deleting: #dc2626;
@@ -52,23 +56,23 @@
 @layer base {
   :root {
     --background: #ffffff;
-    --foreground: #0f172a;
+    --foreground: #0a1628;
     --card: #ffffff;
-    --card-foreground: #0f172a;
+    --card-foreground: #0a1628;
     --popover: #ffffff;
-    --popover-foreground: #0f172a;
-    --primary: #2563eb;
+    --popover-foreground: #0a1628;
+    --primary: #0a1628;
     --primary-foreground: #ffffff;
     --secondary: #f1f5f9;
-    --secondary-foreground: #334155;
+    --secondary-foreground: #0a1628;
     --muted: #f1f5f9;
     --muted-foreground: #64748b;
-    --accent: #f1f5f9;
-    --accent-foreground: #0f172a;
+    --accent: #e8864a;
+    --accent-foreground: #ffffff;
     --destructive: #dc2626;
     --border: #e2e8f0;
     --input: #f1f5f9;
-    --ring: #2563eb;
+    --ring: #0a1628;
     --radius: 0.5rem;
   }
 
@@ -88,7 +92,7 @@
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: #f1f5f9; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #2563eb; }
+::-webkit-scrollbar-thumb:hover { background: #0a1628; }
 
 /* Status pulse */
 @keyframes status-pulse {

@@ -28,7 +28,7 @@ const KINDS_REQUIRING_INTENT: Array<WorkflowNode["kind"]> = [
 
 const KIND_BADGES: Record<WorkflowNode["kind"], { label: string; cls: string }> = {
   semantic_step: { label: "Step", cls: "bg-brand-100 text-brand-700" },
-  mcp_tool: { label: "MCP", cls: "bg-blue-100 text-blue-700" },
+  mcp_tool: { label: "MCP", cls: "bg-blue-100 text-[#0a1628]" },
   skill: { label: "Skill", cls: "bg-purple-100 text-purple-700" },
   subagent: { label: "Sub-agent", cls: "bg-pink-100 text-pink-700" },
   plugin: { label: "Plugin", cls: "bg-orange-100 text-orange-700" },

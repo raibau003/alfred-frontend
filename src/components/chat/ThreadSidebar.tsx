@@ -124,7 +124,7 @@ export function ThreadSidebar({ activeThreadId, onSelectThread, onNewThread }: P
                         onClick={() => onSelectThread(t.id)}
                         className={`flex flex-1 items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-sm transition-colors ${
                           active
-                            ? "bg-blue-50 text-blue-700"
+                            ? "bg-[#0a1628]/5 text-[#0a1628]"
                             : "text-slate-600 hover:bg-slate-100"
                         }`}
                       >

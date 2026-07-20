@@ -177,15 +177,15 @@ export default function SettingsPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">Nombre</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+            <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0a1628] focus:outline-none" />
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">Telefono</label>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" placeholder="+56 9 1234 5678" />
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0a1628] focus:outline-none" placeholder="+56 9 1234 5678" />
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={saveProfile} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+          <button onClick={saveProfile} className="rounded-lg bg-[#0a1628] px-4 py-2 text-sm font-medium text-white hover:bg-[#1e3a5f]">
             {saved ? "Guardado!" : "Guardar"}
           </button>
           <span className="text-xs text-slate-400">{user?.email}</span>
@@ -237,7 +237,7 @@ export default function SettingsPage() {
                   )}
                 </div>
                 <div className="text-center">
-                  <button onClick={checkWhatsAppStatus} className="text-xs text-blue-600 hover:underline flex items-center gap-1 mx-auto">
+                  <button onClick={checkWhatsAppStatus} className="text-xs text-[#0a1628] hover:underline flex items-center gap-1 mx-auto">
                     <RefreshCw className="h-3 w-3" /> Ya escanee, verificar conexion
                   </button>
                 </div>
@@ -322,7 +322,7 @@ export default function SettingsPage() {
 
                 {/* Save button — only shows when there are changes */}
                 {waSettingsChanged && (
-                  <button onClick={saveWaSettings} className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
+                  <button onClick={saveWaSettings} className="w-full rounded-lg bg-[#0a1628] px-4 py-2 text-sm font-medium text-white hover:bg-[#1e3a5f] transition-colors">
                     Guardar cambios
                   </button>
                 )}
@@ -334,15 +334,15 @@ export default function SettingsPage() {
           </div>
 
           {/* Telegram */}
-          <div className={`rounded-lg border p-4 space-y-3 ${tgConnected ? "border-blue-200 bg-blue-50" : "border-slate-200"}`}>
+          <div className={`rounded-lg border p-4 space-y-3 ${tgConnected ? "border-[#0a1628]/20 bg-[#0a1628]/5" : "border-slate-200"}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Send className={`h-4 w-4 ${tgConnected ? "text-blue-600" : "text-slate-400"}`} />
+                <Send className={`h-4 w-4 ${tgConnected ? "text-[#0a1628]" : "text-slate-400"}`} />
                 <span className="text-sm font-medium text-slate-900">Telegram</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className={`inline-block h-2 w-2 rounded-full ${tgConnected ? "bg-blue-500" : "bg-slate-300"}`} />
-                <span className={`text-xs ${tgConnected ? "text-blue-600" : "text-slate-400"}`}>
+                <span className={`inline-block h-2 w-2 rounded-full ${tgConnected ? "bg-[#0a1628]/50" : "bg-slate-300"}`} />
+                <span className={`text-xs ${tgConnected ? "text-[#0a1628]" : "text-slate-400"}`}>
                   {tgConnected ? "Conectado" : "No configurado"}
                 </span>
               </div>
@@ -364,7 +364,7 @@ export default function SettingsPage() {
 
             {tgConnected && tgBotName && (
               <div className="flex items-center gap-2">
-                <span className="text-xs text-blue-700">Bot: @{tgBotName}</span>
+                <span className="text-xs text-[#0a1628]">Bot: @{tgBotName}</span>
               </div>
             )}
 
@@ -376,13 +376,13 @@ export default function SettingsPage() {
                     type="password"
                     value={tgBotToken}
                     onChange={(e) => { setTgBotToken(e.target.value); setTgError(null); }}
-                    className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0a1628] focus:outline-none"
                     placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
                   />
                   <button
                     onClick={connectTelegram}
                     disabled={!tgBotToken.includes(":") || tgConnecting}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-40"
+                    className="rounded-lg bg-[#0a1628] px-4 py-2 text-xs font-medium text-white hover:bg-[#1e3a5f] disabled:opacity-40"
                   >
                     {tgConnecting ? "..." : "Conectar"}
                   </button>
@@ -423,15 +423,15 @@ export default function SettingsPage() {
         </p>
 
         {/* Method 1: Chrome Extension */}
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3">
+        <div className="rounded-lg border border-[#0a1628]/20 bg-[#0a1628]/5 p-4 space-y-3">
           <div className="flex items-center gap-2">
             <span className="text-sm">🧩</span>
             <p className="text-xs font-medium text-blue-900">Extension de Chrome (recomendado)</p>
           </div>
-          <p className="text-[10px] text-blue-700">Instala la extension en Chrome y Alfred podra navegar usando tu browser.</p>
+          <p className="text-[10px] text-[#0a1628]">Instala la extension en Chrome y Alfred podra navegar usando tu browser.</p>
           <div className="rounded-lg bg-white/60 p-3 space-y-2">
             <p className="text-[10px] font-medium text-blue-900">Como instalar:</p>
-            <ol className="text-[10px] text-blue-700 space-y-1 list-decimal list-inside">
+            <ol className="text-[10px] text-[#0a1628] space-y-1 list-decimal list-inside">
               <li>Descarga el archivo ZIP</li>
               <li>Abre Chrome → <code className="bg-blue-100 px-1 rounded">chrome://extensions</code></li>
               <li>Activa &ldquo;Modo desarrollador&rdquo; (arriba a la derecha)</li>
@@ -440,7 +440,7 @@ export default function SettingsPage() {
             </ol>
           </div>
           <div className="flex items-center gap-2">
-            <a href="/alfred-bridge-extension.zip" download className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-700">
+            <a href="/alfred-bridge-extension.zip" download className="inline-flex items-center gap-1 rounded-md bg-[#0a1628] px-4 py-2 text-xs font-medium text-white hover:bg-[#1e3a5f]">
               <Download className="h-3.5 w-3.5" /> Descargar Extension
             </a>
             <span className="text-[10px] text-blue-500">7 KB</span>

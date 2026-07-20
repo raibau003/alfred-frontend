@@ -114,7 +114,7 @@ Responde SOLO el JSON, nada mas.`,
           <div key={s} className="flex items-center gap-2">
             <div
               className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
-                s < step ? "bg-green-500 text-white" : s === step ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-400"
+                s < step ? "bg-green-500 text-white" : s === step ? "bg-[#0a1628] text-white" : "bg-slate-200 text-slate-400"
               }`}
             >
               {s < step ? <Check className="h-3.5 w-3.5" /> : s}
@@ -131,7 +131,7 @@ Responde SOLO el JSON, nada mas.`,
       {step === 1 && (
         <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
           <div className="flex items-center gap-3">
-            <Bot className="h-8 w-8 text-blue-600" />
+            <Bot className="h-8 w-8 text-[#0a1628]" />
             <div>
               <h2 className="text-sm font-semibold text-slate-900">Que quieres que haga?</h2>
               <p className="text-xs text-slate-400">Describe en lenguaje natural</p>
@@ -141,7 +141,7 @@ Responde SOLO el JSON, nada mas.`,
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm focus:border-[#0a1628] focus:outline-none focus:ring-1 focus:ring-[#0a1628]"
             rows={4}
             placeholder='Ej: "Quiero un agente que monitoree el precio de Bitcoin y me avise si baja de 50,000 USD"'
           />
@@ -166,7 +166,7 @@ Responde SOLO el JSON, nada mas.`,
           <button
             onClick={analyzePrompt}
             disabled={!prompt.trim() || analyzing}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-[#0a1628] px-4 py-2 text-sm font-medium text-white hover:bg-[#1e3a5f] disabled:opacity-50"
           >
             {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
             {analyzing ? "Analizando..." : "Siguiente"}
@@ -212,7 +212,7 @@ Responde SOLO el JSON, nada mas.`,
               <label className="block text-xs font-medium text-slate-500 mb-1">Conectores necesarios</label>
               <div className="flex flex-wrap gap-1">
                 {proposal.connectors.map((c, i) => (
-                  <span key={i} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700 border border-blue-200">
+                  <span key={i} className="rounded-full bg-[#0a1628]/5 px-2 py-0.5 text-xs text-[#0a1628] border border-[#0a1628]/20">
                     {c}
                   </span>
                 ))}
@@ -230,7 +230,7 @@ Responde SOLO el JSON, nada mas.`,
             <button
               onClick={createAgent}
               disabled={creating}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg bg-[#0a1628] px-4 py-2 text-sm font-medium text-white hover:bg-[#1e3a5f] disabled:opacity-50"
             >
               {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
               {creating ? "Creando..." : "Crear agente"}

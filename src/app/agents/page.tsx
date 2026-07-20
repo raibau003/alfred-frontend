@@ -8,7 +8,7 @@ import type { Agent } from "@/lib/supabase/types";
 
 const categoryConfig: Record<string, { label: string; color: string; icon: typeof Bot }> = {
   finanzas: { label: "Finanzas", color: "bg-green-50 text-green-700 border-green-200", icon: Zap },
-  correo: { label: "Correo", color: "bg-blue-50 text-blue-700 border-blue-200", icon: Mail },
+  correo: { label: "Correo", color: "bg-[#0a1628]/5 text-[#0a1628] border-[#0a1628]/20", icon: Mail },
   hogar: { label: "Hogar", color: "bg-orange-50 text-orange-700 border-orange-200", icon: Home },
   compras: { label: "Compras", color: "bg-purple-50 text-purple-700 border-purple-200", icon: ShoppingCart },
   bienestar: { label: "Bienestar", color: "bg-pink-50 text-pink-700 border-pink-200", icon: Heart },
@@ -58,7 +58,7 @@ export default function AgentsPage() {
         </div>
         <Link
           href="/agents/new"
-          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 rounded-lg bg-[#0a1628] px-4 py-2 text-sm font-medium text-white hover:bg-[#1e3a5f] transition-colors"
         >
           <Plus className="h-4 w-4" />
           Crear agente
@@ -70,7 +70,7 @@ export default function AgentsPage() {
         <button
           onClick={() => setFilter(null)}
           className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-            !filter ? "bg-blue-600 text-white border-blue-600" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+            !filter ? "bg-[#0a1628] text-white border-[#0a1628]" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
           }`}
         >
           Todos
@@ -82,7 +82,7 @@ export default function AgentsPage() {
               key={cat}
               onClick={() => setFilter(cat === filter ? null : cat!)}
               className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-                filter === cat ? "bg-blue-600 text-white border-blue-600" : cfg.color
+                filter === cat ? "bg-[#0a1628] text-white border-[#0a1628]" : cfg.color
               }`}
             >
               {cfg.label}
@@ -107,8 +107,8 @@ export default function AgentsPage() {
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${agent.enabled ? "bg-blue-50" : "bg-slate-100"}`}>
-                    <Bot className={`h-5 w-5 ${agent.enabled ? "text-blue-600" : "text-slate-400"}`} />
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${agent.enabled ? "bg-[#0a1628]/5" : "bg-slate-100"}`}>
+                    <Bot className={`h-5 w-5 ${agent.enabled ? "text-[#0a1628]" : "text-slate-400"}`} />
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-slate-900">{agent.name}</h3>
@@ -124,7 +124,7 @@ export default function AgentsPage() {
                 <button
                   onClick={() => toggleAgent(agent.id, !agent.enabled)}
                   className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                    agent.enabled ? "bg-blue-600" : "bg-slate-300"
+                    agent.enabled ? "bg-[#0a1628]" : "bg-slate-300"
                   }`}
                 >
                   <span

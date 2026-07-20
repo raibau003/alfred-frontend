@@ -19,7 +19,7 @@ export function ActionButtons({ actions, onAction }: Props) {
         <button
           key={i}
           onClick={() => onAction(action.message)}
-          className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs text-blue-700 hover:bg-blue-100 transition-colors"
+          className="flex items-center gap-1 rounded-lg border border-[#0a1628]/20 bg-[#0a1628]/5 px-3 py-1.5 text-xs text-[#0a1628] hover:bg-blue-100 transition-colors"
         >
           {action.label}
         </button>

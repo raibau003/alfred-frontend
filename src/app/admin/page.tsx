@@ -230,7 +230,7 @@ export default function AdminPage() {
           <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
             <div className="px-4 py-2 border-b border-slate-200 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-900">Test Cluster Dashboard</h3>
-              <a href="https://alfred-test-dashboard.vercel.app" target="_blank" className="text-[10px] text-blue-600 hover:underline">Abrir completo</a>
+              <a href="https://alfred-test-dashboard.vercel.app" target="_blank" className="text-[10px] text-[#0a1628] hover:underline">Abrir completo</a>
             </div>
             <iframe src="https://alfred-test-dashboard.vercel.app" className="w-full h-[600px] border-0" />
           </div>
@@ -303,7 +303,7 @@ export default function AdminPage() {
                   return (
                     <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50">
                       <td className="py-1.5 px-3 text-slate-400 whitespace-nowrap">{time}</td>
-                      <td className="px-2"><span className={`text-[10px] px-1.5 py-0.5 rounded ${c.channel === "whatsapp" ? "bg-green-50 text-green-700" : c.channel === "web" ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"}`}>{c.channel}</span></td>
+                      <td className="px-2"><span className={`text-[10px] px-1.5 py-0.5 rounded ${c.channel === "whatsapp" ? "bg-green-50 text-green-700" : c.channel === "web" ? "bg-[#0a1628]/5 text-[#0a1628]" : "bg-slate-100 text-slate-600"}`}>{c.channel}</span></td>
                       <td className="px-2 font-medium text-slate-700">{(c.agent || "chat").replace("agent-", "")}</td>
                       <td className="px-2 text-slate-600 max-w-xs truncate">{c.prompt?.substring(0, 50)}</td>
                       <td className="px-2 text-right text-slate-400">{c.duration_ms > 0 ? `${Math.round(c.duration_ms / 1000)}s` : "-"}</td>
@@ -349,7 +349,7 @@ export default function AdminPage() {
                   <div key={agent} className="flex items-center gap-3">
                     <span className="w-28 text-xs text-slate-700 truncate">{agent.replace("agent-", "")}</span>
                     <div className="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(count / max) * 100}%` }} />
+                      <div className="h-full bg-[#0a1628]/50 rounded-full" style={{ width: `${(count / max) * 100}%` }} />
                     </div>
                     <span className="text-xs text-slate-500 w-12 text-right">{count}</span>
                   </div>
@@ -457,7 +457,7 @@ export default function AdminPage() {
           <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
             <div className="px-4 py-2 border-b border-slate-200 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-900">Test Cluster — Vista Completa</h3>
-              <a href="https://alfred-test-dashboard.vercel.app" target="_blank" className="text-[10px] text-blue-600 hover:underline">Abrir en nueva ventana</a>
+              <a href="https://alfred-test-dashboard.vercel.app" target="_blank" className="text-[10px] text-[#0a1628] hover:underline">Abrir en nueva ventana</a>
             </div>
             <iframe src="https://alfred-test-dashboard.vercel.app" className="w-full h-[700px] border-0" />
           </div>
@@ -500,7 +500,7 @@ export default function AdminPage() {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <span className="text-slate-400 font-mono">{time}</span>
-                              <span className={`px-1 rounded ${log.channel === "whatsapp" ? "bg-green-100 text-green-700" : log.channel === "web" ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"}`}>{log.channel}</span>
+                              <span className={`px-1 rounded ${log.channel === "whatsapp" ? "bg-green-100 text-green-700" : log.channel === "web" ? "bg-blue-100 text-[#0a1628]" : "bg-slate-100 text-slate-600"}`}>{log.channel}</span>
                               {dur > 0 && <span className="text-slate-400">{dur}s</span>}
                               {hasError && <span className="text-red-500 font-bold">ERROR</span>}
                             </div>

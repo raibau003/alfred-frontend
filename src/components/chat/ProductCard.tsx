@@ -23,7 +23,7 @@ export function ProductCard({ product, onCompare, onAddToCart }: Props) {
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-slate-900 truncate">{product.name}</p>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-bold text-blue-600">${product.price.toLocaleString("es-CL")}</span>
+          <span className="text-sm font-bold text-[#0a1628]">${product.price.toLocaleString("es-CL")}</span>
           <span className="text-[10px] text-slate-400 uppercase">{product.store}</span>
         </div>
       </div>
@@ -39,7 +39,7 @@ export function ProductCard({ product, onCompare, onAddToCart }: Props) {
         {onAddToCart && (
           <button
             onClick={() => onAddToCart(product)}
-            className="rounded-md bg-blue-600 px-2 py-1 text-[10px] text-white hover:bg-blue-700"
+            className="rounded-md bg-[#0a1628] px-2 py-1 text-[10px] text-white hover:bg-[#1e3a5f]"
           >
             Agregar
           </button>

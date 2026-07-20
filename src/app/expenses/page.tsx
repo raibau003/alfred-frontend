@@ -129,7 +129,7 @@ export default function ExpensesPage() {
           <button
             onClick={generateReport}
             disabled={generating || services.length === 0}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-[#0a1628] px-4 py-2 text-sm font-medium text-white hover:bg-[#1e3a5f] disabled:opacity-50"
           >
             {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4" />}
             {generating ? "Generando..." : "Generar rendicion"}
@@ -143,7 +143,7 @@ export default function ExpensesPage() {
           <h2 className="text-sm font-semibold text-slate-900">Servicios a rendir ({services.length})</h2>
           <button
             onClick={() => setShowAdd(true)}
-            className="flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-xs text-white hover:bg-blue-700"
+            className="flex items-center gap-1 rounded-md bg-[#0a1628] px-3 py-1.5 text-xs text-white hover:bg-[#1e3a5f]"
           >
             <Plus className="h-3 w-3" />
             Agregar servicio
@@ -151,7 +151,7 @@ export default function ExpensesPage() {
         </div>
 
         {showAdd && (
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3">
+          <div className="rounded-lg border border-[#0a1628]/20 bg-[#0a1628]/5 p-4 space-y-3">
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">Nombre</label>
@@ -190,7 +190,7 @@ export default function ExpensesPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <button onClick={addService} className="rounded-md bg-blue-600 px-3 py-1 text-xs text-white">Agregar</button>
+              <button onClick={addService} className="rounded-md bg-[#0a1628] px-3 py-1 text-xs text-white">Agregar</button>
               <button onClick={() => setShowAdd(false)} className="rounded-md border border-slate-300 px-3 py-1 text-xs text-slate-600">Cancelar</button>
             </div>
           </div>

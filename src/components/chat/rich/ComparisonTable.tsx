@@ -61,7 +61,7 @@ export function ComparisonTable({ product, comparisons, onAction }: Props) {
                   {c.available && (
                     <button
                       onClick={() => onAction(`agrega "${product}" de ${c.store} a $${c.price} al carro`)}
-                      className="rounded bg-blue-600 px-2 py-0.5 text-[9px] text-white hover:bg-blue-700"
+                      className="rounded bg-[#0a1628] px-2 py-0.5 text-[9px] text-white hover:bg-[#1e3a5f]"
                     >
                       <ShoppingCart className="h-2.5 w-2.5 inline mr-0.5" />Agregar
                     </button>

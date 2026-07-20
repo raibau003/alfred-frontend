@@ -144,11 +144,11 @@ export function ChatView({ messages, busy, connected, onSend, userName, onToggle
                 {msg.agent && msg.role === "assistant" && (
                   <div className="flex items-center gap-1.5 mb-1">
                     <div className="h-4 w-4 rounded bg-blue-100 flex items-center justify-center">
-                      <span className="text-[8px] font-bold text-blue-600">
+                      <span className="text-[8px] font-bold text-[#0a1628]">
                         {msg.agent.replace("agent-", "").charAt(0).toUpperCase()}
                       </span>
                     </div>
-                    <span className="text-[10px] font-medium text-blue-600">
+                    <span className="text-[10px] font-medium text-[#0a1628]">
                       {msg.agent.replace("agent-", "").replace("chat-ai", "Alfred")}
                     </span>
                   </div>
@@ -218,7 +218,7 @@ export function ChatView({ messages, busy, connected, onSend, userName, onToggle
       {/* Input */}
       <div className="border-t border-slate-200 p-3 shrink-0">
         <div className="max-w-3xl mx-auto">
-          <div className="flex items-end gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 shadow-sm">
+          <div className="flex items-end gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2 focus-within:border-[#0a1628] focus-within:ring-1 focus-within:ring-[#0a1628] shadow-sm">
             <textarea
               ref={inputRef}
               value={input}

@@ -140,7 +140,7 @@ export default function DashboardPage() {
         {/* Agent monitor */}
         <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-3">
           <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-            <Activity className="h-4 w-4 text-blue-600" />
+            <Activity className="h-4 w-4 text-[#0a1628]" />
             Agentes — Actividad
           </h2>
           <div className="space-y-1.5 max-h-80 overflow-y-auto">

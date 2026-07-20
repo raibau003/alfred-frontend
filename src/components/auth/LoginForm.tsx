@@ -46,7 +46,7 @@ export function LoginForm() {
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0a1628] focus:outline-none focus:ring-1 focus:ring-[#0a1628]"
                   placeholder="Tu nombre"
                   required
                 />
@@ -57,7 +57,7 @@ export function LoginForm() {
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0a1628] focus:outline-none focus:ring-1 focus:ring-[#0a1628]"
                   placeholder="+56 9 1234 5678"
                 />
               </div>
@@ -70,7 +70,7 @@ export function LoginForm() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0a1628] focus:outline-none focus:ring-1 focus:ring-[#0a1628]"
               placeholder="tu@email.com"
               required
             />
@@ -82,7 +82,7 @@ export function LoginForm() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0a1628] focus:outline-none focus:ring-1 focus:ring-[#0a1628]"
               placeholder="••••••••"
               required
               minLength={6}
@@ -96,7 +96,7 @@ export function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="w-full rounded-lg bg-[#0a1628] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#1e3a5f] disabled:opacity-50 transition-colors"
           >
             {loading ? "..." : mode === "login" ? "Entrar" : "Crear cuenta"}
           </button>
@@ -106,7 +106,7 @@ export function LoginForm() {
           {mode === "login" ? "No tienes cuenta?" : "Ya tienes cuenta?"}{" "}
           <button
             onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(null); }}
-            className="font-medium text-blue-600 hover:underline"
+            className="font-medium text-[#0a1628] hover:underline"
           >
             {mode === "login" ? "Registrate" : "Inicia sesion"}
           </button>

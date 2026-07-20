@@ -32,7 +32,7 @@ export function CartView({ items, onAction, onCheckout }: Props) {
   return (
     <div className="mt-2 space-y-3">
       <div className="flex items-center gap-2 px-1">
-        <ShoppingCart className="h-4 w-4 text-blue-600" />
+        <ShoppingCart className="h-4 w-4 text-[#0a1628]" />
         <span className="text-xs font-semibold text-slate-900">
           Tu carro — {items.length} productos — ${grandTotal.toLocaleString("es-CL")}
         </span>
@@ -45,7 +45,7 @@ export function CartView({ items, onAction, onCheckout }: Props) {
             {/* Store header */}
             <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-b border-slate-200">
               <span className="text-xs font-bold text-slate-900 uppercase">{store}</span>
-              <span className="text-xs font-semibold text-blue-600">${storeTotal.toLocaleString("es-CL")}</span>
+              <span className="text-xs font-semibold text-[#0a1628]">${storeTotal.toLocaleString("es-CL")}</span>
             </div>
 
             {/* Items */}
@@ -78,7 +78,7 @@ export function CartView({ items, onAction, onCheckout }: Props) {
             <div className="px-3 py-2 bg-slate-50 border-t border-slate-200">
               <button
                 onClick={() => onAction(`ir a pagar en ${store}`)}
-                className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2 text-xs font-medium text-white hover:bg-blue-700"
+                className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-[#0a1628] py-2 text-xs font-medium text-white hover:bg-[#1e3a5f]"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
                 Ir a pagar en {store} — ${storeTotal.toLocaleString("es-CL")}
@@ -89,9 +89,9 @@ export function CartView({ items, onAction, onCheckout }: Props) {
       })}
 
       {stores.length > 1 && (
-        <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-blue-50 border border-blue-200">
+        <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#0a1628]/5 border border-[#0a1628]/20">
           <span className="text-xs font-semibold text-blue-900">Total ({stores.length} supers)</span>
-          <span className="text-sm font-bold text-blue-600">${grandTotal.toLocaleString("es-CL")}</span>
+          <span className="text-sm font-bold text-[#0a1628]">${grandTotal.toLocaleString("es-CL")}</span>
         </div>
       )}
     </div>

@@ -38,7 +38,7 @@ export function ShoppingCartPanel() {
             onClick={() => setActiveStore(cart.store)}
             className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium border-b-2 transition-colors ${
               (activeStore ?? carts[0]?.store) === cart.store
-                ? "border-blue-600 text-blue-700"
+                ? "border-[#0a1628] text-[#0a1628]"
                 : "border-transparent text-slate-500 hover:text-slate-700"
             }`}
           >
@@ -60,9 +60,9 @@ export function ShoppingCartPanel() {
           ))}
           <div className="flex items-center justify-between border-t border-slate-200 pt-2">
             <span className="text-xs font-semibold text-slate-900">Total</span>
-            <span className="text-sm font-bold text-blue-600">${active.total.toLocaleString("es-CL")}</span>
+            <span className="text-sm font-bold text-[#0a1628]">${active.total.toLocaleString("es-CL")}</span>
           </div>
-          <button className="w-full flex items-center justify-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700">
+          <button className="w-full flex items-center justify-center gap-1 rounded-md bg-[#0a1628] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#1e3a5f]">
             <ExternalLink className="h-3 w-3" />
             Ir a pagar en {active.store}
           </button>

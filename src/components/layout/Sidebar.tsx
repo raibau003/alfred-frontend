@@ -113,7 +113,7 @@ export function Sidebar() {
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150",
                 active
-                  ? "bg-blue-50 text-brand-600"
+                  ? "bg-[#0a1628]/5 text-brand-600"
                   : "text-slate-500 hover:bg-surface-3 hover:text-slate-900"
               )}
             >
@@ -161,7 +161,7 @@ export function Sidebar() {
                 {status === "disconnected" && (
                   <button
                     onClick={handleRebuild}
-                    className="flex-1 flex items-center justify-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-[10px] text-white hover:bg-blue-700"
+                    className="flex-1 flex items-center justify-center gap-1 rounded-md bg-[#0a1628] px-2 py-1 text-[10px] text-white hover:bg-[#1e3a5f]"
                   >
                     <RefreshCw className="h-3 w-3" />
                     Rebuild
@@ -171,7 +171,7 @@ export function Sidebar() {
             </div>
             <Link
               href="/settings"
-              className="block text-center text-[10px] text-blue-600 hover:underline"
+              className="block text-center text-[10px] text-[#0a1628] hover:underline"
               onClick={() => setShowStatus(false)}
             >
               Ver configuracion completa
@@ -183,7 +183,7 @@ export function Sidebar() {
       {/* User */}
       <div className="border-t border-surface-4 p-3 space-y-1.5">
         <div className="flex items-center gap-2 text-xs text-slate-500 px-1">
-          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold shrink-0">
+          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-[#0a1628] text-[10px] font-bold shrink-0">
             {user?.email?.[0]?.toUpperCase() ?? "U"}
           </div>
           <span className="truncate">{user?.email ?? "Usuario"}</span>
