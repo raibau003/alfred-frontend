@@ -396,17 +396,31 @@ export default function AgentDetailPage() {
                       <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Supermercados activos</p>
                       <p className="text-[9px] text-slate-400 mb-2">Mientras mas supermercados actives, mas tiempo le toma a Alfred (como a ti)</p>
                       <div className="space-y-1.5">
-                        {Object.entries(config.stores as Record<string, boolean>).map(([store, enabled]) => (
-                          <div key={store} className="flex items-center justify-between rounded-md bg-white px-3 py-2 border border-slate-100">
-                            <span className="text-xs text-slate-700 capitalize">{store.replace(/_/g, " ")}</span>
-                            <button
-                              onClick={() => toggleStore(store, !enabled)}
-                              className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors ${enabled ? "bg-green-600" : "bg-slate-300"}`}
-                            >
-                              <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-4" : "translate-x-0.5"}`} />
-                            </button>
-                          </div>
-                        ))}
+                        {Object.entries(config.stores as Record<string, boolean>).map(([store, enabled]) => {
+                          const storeEmojis: Record<string, string> = { jumbo: "🟢", lider: "🔵", unimarc: "🟡", tottus: "🟠", santa_isabel: "🔴", mercadolibre: "🟣" };
+                          const note = (config.store_notes as Record<string, string>)?.[store];
+                          const needsBridge = note?.includes("Bridge");
+                          return (
+                            <div key={store} className={`flex items-center justify-between rounded-md bg-white px-3 py-2 border ${needsBridge && !enabled ? "border-yellow-200" : "border-slate-100"}`}>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">{storeEmojis[store] || "🏪"}</span>
+                                <div>
+                                  <span className="text-xs text-slate-700 capitalize">{store.replace(/_/g, " ")}</span>
+                                  {note && <p className="text-[8px] text-slate-400">{note}</p>}
+                                  {needsBridge && !enabled && (
+                                    <a href="/settings" className="text-[8px] text-[#e8864a] hover:underline">Configurar PC Bridge</a>
+                                  )}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => toggleStore(store, !enabled)}
+                                className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors ${enabled ? "bg-green-600" : "bg-slate-300"}`}
+                              >
+                                <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-4" : "translate-x-0.5"}`} />
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
