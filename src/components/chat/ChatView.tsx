@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatMessage } from "@/hooks/useAlfred";
 import { ProductCards } from "./rich/ProductCards";
+import { ProductCarousel } from "./rich/ProductCarousel";
 import { ActionButtons } from "./rich/ActionButtons";
 import { ComparisonTable } from "./rich/ComparisonTable";
 import { CartView } from "./rich/CartView";
@@ -187,11 +188,31 @@ export function ChatView({ messages, busy, connected, onSend, userName, onToggle
                         return null;
                       })()}
                       {/* Regular markdown content (if no progress bar) */}
-                      {!msg.content.match(/\d+%.*restantes/) && (
-                        <div className="prose prose-sm prose-slate max-w-none [&_table]:text-xs [&_th]:px-2 [&_td]:px-2 [&_h2]:text-sm [&_h3]:text-sm [&_p]:my-1">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                        </div>
-                      )}
+                      {!msg.content.match(/\d+%.*restantes/) && (() => {
+                        // Try to extract JSON products from the text
+                        const jsonMatch = msg.content.match(/```json\s*([\s\S]*?)```/);
+                        let inlineProducts: any[] | null = null;
+                        let cleanContent = msg.content;
+                        if (jsonMatch) {
+                          try {
+                            const parsed = JSON.parse(jsonMatch[1]);
+                            if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].price !== undefined) {
+                              inlineProducts = parsed;
+                              cleanContent = msg.content.replace(/```json[\s\S]*?```/, "").trim();
+                            }
+                          } catch {}
+                        }
+                        return (
+                          <>
+                            {cleanContent && (
+                              <div className="prose prose-sm prose-slate max-w-none [&_table]:text-xs [&_th]:px-2 [&_td]:px-2 [&_h2]:text-sm [&_h3]:text-sm [&_p]:my-1">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanContent}</ReactMarkdown>
+                              </div>
+                            )}
+                            {inlineProducts && <ProductCarousel products={inlineProducts} onAction={onSend} />}
+                          </>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -202,7 +223,7 @@ export function ChatView({ messages, busy, connected, onSend, userName, onToggle
                 {msg.rich && msg.role === "assistant" && (
                   <>
                     {msg.rich.type === "product_list" && msg.rich.products && (
-                      <ProductCards products={msg.rich.products} onAction={onSend} />
+                      <ProductCarousel products={msg.rich.products} onAction={onSend} />
                     )}
                     {msg.rich.type === "comparison" && msg.rich.comparisons && (
                       <ComparisonTable product={msg.rich.product || ""} comparisons={msg.rich.comparisons} onAction={onSend} />
