@@ -357,22 +357,100 @@ export default function AgentDetailPage() {
         )}
       </div>
 
-      {/* Connectors */}
+      {/* Connectors — expandable with custom config */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
         <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
           <Plug className="h-4 w-4 text-green-600" />
           Conectores ({connectors.length})
         </h2>
         <div className="space-y-2">
-          {connectors.map((c) => (
-            <div key={c.id} className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
-              <div>
-                <p className="text-sm font-medium text-slate-900">{c.name}</p>
-                <p className="text-[10px] text-slate-400">{c.type} &middot; {c.status}</p>
-              </div>
-              <span className={`inline-block h-2 w-2 rounded-full ${c.status === "connected" ? "bg-green-500" : "bg-slate-300"}`} />
-            </div>
-          ))}
+          {connectors.map((c) => {
+            const config = (c.config || {}) as Record<string, any>;
+            const hasStores = config.stores && typeof config.stores === "object";
+            const hasServicios = config.servicios && Array.isArray(config.servicios);
+
+            const toggleStore = async (store: string, enabled: boolean) => {
+              const newStores = { ...config.stores, [store]: enabled };
+              const supabase = createClient();
+              await supabase.from("connectors").update({ config: { ...config, stores: newStores } }).eq("id", c.id);
+              setConnectors(prev => prev.map(x => x.id === c.id ? { ...x, config: { ...config, stores: newStores } } as any : x));
+            };
+
+            return (
+              <details key={c.id} className="group rounded-lg border border-slate-200 overflow-hidden">
+                <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-50">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400 group-open:rotate-90 transition-transform text-xs">▶</span>
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{c.name}</p>
+                      <p className="text-[10px] text-slate-400">{c.type} &middot; {c.status}</p>
+                    </div>
+                  </div>
+                  <span className={`inline-block h-2 w-2 rounded-full ${c.status === "connected" ? "bg-green-500" : "bg-slate-300"}`} />
+                </summary>
+
+                <div className="border-t border-slate-100 p-3 bg-slate-50 space-y-3">
+                  {/* Store toggles for compras agent */}
+                  {hasStores && (
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Supermercados activos</p>
+                      <p className="text-[9px] text-slate-400 mb-2">Mientras mas supermercados actives, mas tiempo le toma a Alfred (como a ti)</p>
+                      <div className="space-y-1.5">
+                        {Object.entries(config.stores as Record<string, boolean>).map(([store, enabled]) => (
+                          <div key={store} className="flex items-center justify-between rounded-md bg-white px-3 py-2 border border-slate-100">
+                            <span className="text-xs text-slate-700 capitalize">{store.replace(/_/g, " ")}</span>
+                            <button
+                              onClick={() => toggleStore(store, !enabled)}
+                              className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors ${enabled ? "bg-green-600" : "bg-slate-300"}`}
+                            >
+                              <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-4" : "translate-x-0.5"}`} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Services list for gastos agent */}
+                  {hasServicios && (
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Servicios configurados</p>
+                      <div className="space-y-1">
+                        {(config.servicios as Array<{name: string; type: string}>).map((s, i) => (
+                          <div key={i} className="flex items-center justify-between rounded-md bg-white px-3 py-1.5 border border-slate-100">
+                            <div>
+                              <span className="text-xs text-slate-700">{s.name}</span>
+                              <span className="text-[9px] text-slate-400 ml-2">{s.type}</span>
+                            </div>
+                            <button
+                              onClick={async () => {
+                                const newServicios = config.servicios.filter((_: any, idx: number) => idx !== i);
+                                const supabase = createClient();
+                                await supabase.from("connectors").update({ config: { ...config, servicios: newServicios } }).eq("id", c.id);
+                                setConnectors(prev => prev.map(x => x.id === c.id ? { ...x, config: { ...config, servicios: newServicios } } as any : x));
+                              }}
+                              className="text-[10px] text-red-400 hover:text-red-600"
+                            >
+                              Quitar
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Generic config display */}
+                  {!hasStores && !hasServicios && Object.keys(config).length > 0 && (
+                    <div className="text-[10px] text-slate-500 font-mono bg-white rounded p-2 border border-slate-100">
+                      {Object.entries(config).map(([k, v]) => (
+                        <div key={k}>{k}: {typeof v === "string" ? v : JSON.stringify(v)}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </details>
+            );
+          })}
           {connectors.length === 0 && (
             <p className="py-3 text-center text-xs text-slate-400">
               Sin conectores. <a href="/connectors" className="text-[#0a1628] hover:underline">Configurar</a>
