@@ -93,13 +93,15 @@ export function useAlfred(threadId?: string) {
     [user]
   );
 
-  // Simple polling: show ALL new assistant messages as they appear
+  // Polling: show messages + heartbeat + detect final response
   const startPolling = useCallback(
     () => {
       if (pollRef.current) clearInterval(pollRef.current);
       let lastMsgCount = 0;
       let stablePolls = 0;
       let foundFinal = false;
+      let lastHeartbeat = Date.now();
+      const HEARTBEAT_INTERVAL = 15000; // Show "sigue trabajando" every 15s
 
       pollRef.current = setInterval(async () => {
         if (!sessionRef.current || foundFinal) return;
@@ -107,10 +109,12 @@ export function useAlfred(threadId?: string) {
           const msgs = await getMessages(sessionRef.current);
 
           // Show any new assistant messages
+          let hasNew = false;
           for (const msg of msgs) {
             if (msg.role !== "assistant") continue;
             if (seenTextsRef.current.has(msg.text)) continue;
             seenTextsRef.current.add(msg.text);
+            hasNew = true;
 
             setMessages((prev) => [...prev, {
               id: `a-${Date.now()}-${Math.random()}`,
@@ -122,7 +126,25 @@ export function useAlfred(threadId?: string) {
             }]);
           }
 
-          // Check stability: if message count hasn't changed for 3 polls (6s) = done
+          if (hasNew) lastHeartbeat = Date.now();
+
+          // Heartbeat: if no new messages for 15s, show "sigue trabajando"
+          if (!hasNew && Date.now() - lastHeartbeat > HEARTBEAT_INTERVAL) {
+            const heartbeatId = `hb-${Date.now()}`;
+            const elapsed = Math.round((Date.now() - lastHeartbeat) / 1000);
+            setMessages((prev) => {
+              // Remove previous heartbeat
+              const withoutHb = prev.filter(m => !m.id.startsWith("hb-"));
+              return [...withoutHb, {
+                id: heartbeatId,
+                role: "assistant" as const,
+                content: `Alfred sigue trabajando... (${elapsed}s)`,
+                timestamp: new Date(),
+              }];
+            });
+          }
+
+          // Check stability
           if (msgs.length === lastMsgCount && msgs.length > 0) {
             stablePolls++;
           } else {
@@ -130,21 +152,20 @@ export function useAlfred(threadId?: string) {
             lastMsgCount = msgs.length;
           }
 
-          // After 3 stable polls AND we have at least 1 non-progress assistant message = done
-          if (stablePolls >= 3) {
+          // After 5 stable polls (10s) check for real response
+          if (stablePolls >= 5) {
             const assistantMsgs = msgs.filter(m => m.role === "assistant");
-            const hasRealResponse = assistantMsgs.some(m =>
-              m.text.length > 30 &&
-              !m.text.endsWith("...") &&
-              !m.text.includes("% (~") &&
-              !m.text.match(/^\s*(buscando|revisando|consultando|ejecutando|procesando)/i)
-            );
+            const isProgress = (t: string) => t.endsWith("...") || t.includes("% (~") || t.includes("restantes)") || /^\s*(buscando|revisando|consultando|ejecutando|procesando|trabajando|alfred sigue)/i.test(t);
+            const hasRealResponse = assistantMsgs.some(m => m.text.length > 30 && !isProgress(m.text));
+
             if (hasRealResponse) {
               foundFinal = true;
               if (pollRef.current) clearInterval(pollRef.current);
               setBusy(false);
+              // Remove heartbeats
+              setMessages(prev => prev.filter(m => !m.id.startsWith("hb-")));
               // Save the final response
-              const lastReal = assistantMsgs.filter(m => m.text.length > 30 && !m.text.endsWith("...")).pop();
+              const lastReal = assistantMsgs.filter(m => m.text.length > 30 && !isProgress(m.text)).pop();
               if (lastReal) saveMessage("assistant", lastReal.text, lastReal.agent);
             }
           }
