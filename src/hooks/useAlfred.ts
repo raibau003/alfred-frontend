@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { createSession, sendPrompt, getMessages, type AlfredMessage } from "@/lib/alfred/client";
+import { createSession, sendPrompt, getMessages, stopSession, type AlfredMessage } from "@/lib/alfred/client";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 
@@ -144,8 +144,8 @@ export function useAlfred(threadId?: string) {
             });
           }
 
-          // PRIMARY: Router says "done" = we're done
-          if (status === "done") {
+          // PRIMARY: Router says "done" or "stopped" = we're done
+          if (status === "done" || status === "stopped") {
             foundFinal = true;
             if (pollRef.current) clearInterval(pollRef.current);
             setBusy(false);
@@ -213,11 +213,25 @@ export function useAlfred(threadId?: string) {
     initSession();
   }, [initSession]);
 
+  const stop = useCallback(() => {
+    if (sessionRef.current) {
+      stopSession(sessionRef.current);
+    }
+    setBusy(false);
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    // Remove heartbeat messages
+    setMessages((prev) => prev.filter((m) => !m.id.startsWith("hb-")));
+  }, []);
+
   return {
     messages,
     busy,
     connected,
     send,
+    stop,
     newThread,
     currentThreadId,
   };

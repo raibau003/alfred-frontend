@@ -50,6 +50,7 @@ export default function ChatPage() {
         busy={alfred.busy}
         connected={alfred.connected}
         onSend={alfred.send}
+        onStop={alfred.stop}
         userName={user?.email?.split("@")[0] ?? "Usuario"}
         onToggleThreads={() => setShowThreads(!showThreads)}
         showThreadsButton={!showThreads}

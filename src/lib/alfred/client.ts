@@ -66,4 +66,8 @@ export async function getMessages(sessionId: string): Promise<{ messages: Alfred
   }
 }
 
+export async function stopSession(sessionId: string): Promise<void> {
+  await fetch(`${ROUTER_URL}/session/${sessionId}/stop`, { method: "POST" });
+}
+
 export { ROUTER_URL };
