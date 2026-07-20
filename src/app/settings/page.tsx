@@ -466,21 +466,43 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Chrome Extension */}
+        {/* Install — OS detection */}
         <div className="rounded-lg border border-[#0a1628]/20 bg-[#0a1628]/5 p-4 space-y-3">
           <div className="flex items-center gap-2">
-            <span className="text-sm">🧩</span>
-            <p className="text-xs font-medium text-[#0a1628]">Extension de Chrome</p>
+            <span className="text-sm">💻</span>
+            <p className="text-xs font-medium text-[#0a1628]">Instalar en tu computador</p>
           </div>
-          <ol className="text-[10px] text-[#0a1628] space-y-1.5 list-decimal list-inside">
-            <li>Descarga e instala la extension</li>
-            <li>Click en el icono <strong>A</strong> en la barra de Chrome</li>
-            <li>Pega tu token (copialo arriba) y haz click Conectar</li>
-            <li>Listo — funciona siempre que Chrome este abierto</li>
-          </ol>
-          <a href="/alfred-bridge-extension.zip" download className="inline-flex items-center gap-1 rounded-md bg-[#0a1628] px-4 py-2 text-xs font-medium text-white hover:bg-[#1e3a5f]">
-            <Download className="h-3.5 w-3.5" /> Descargar Extension
-          </a>
+          <p className="text-[10px] text-[#0a1628]">
+            Se instala como servicio — arranca automaticamente con tu PC. No necesita Chrome abierto.
+          </p>
+
+          {/* Mac */}
+          <div className="rounded-lg bg-white/60 p-3 space-y-2">
+            <p className="text-[10px] font-medium text-slate-700">🍎 Mac — 1 comando:</p>
+            <div className="flex gap-2 items-center">
+              <code className="flex-1 rounded border border-slate-300 bg-white px-2 py-1.5 text-[9px] font-mono text-slate-600 select-all overflow-x-auto">
+                curl -fsSL https://alfred-frontend-vercel.vercel.app/install-mac.sh | bash -s -- {bridgeToken}
+              </code>
+              <button
+                onClick={() => { navigator.clipboard.writeText(`curl -fsSL https://alfred-frontend-vercel.vercel.app/install-mac.sh | bash -s -- ${bridgeToken}`); }}
+                className="shrink-0 rounded bg-[#0a1628] px-2 py-1.5 text-[9px] text-white hover:bg-[#1e3a5f]"
+              >
+                Copiar
+              </button>
+            </div>
+            <p className="text-[9px] text-slate-400">Abre Terminal y pega el comando. Se instala solo y arranca con tu Mac.</p>
+          </div>
+
+          {/* Windows */}
+          <div className="rounded-lg bg-white/60 p-3 space-y-2">
+            <p className="text-[10px] font-medium text-slate-700">🪟 Windows:</p>
+            <div className="flex gap-2">
+              <a href="/install-windows.bat" download className="inline-flex items-center gap-1 rounded bg-[#0a1628] px-3 py-1.5 text-[9px] text-white hover:bg-[#1e3a5f]">
+                <Download className="h-3 w-3" /> Descargar instalador
+              </a>
+              <span className="text-[9px] text-slate-400 self-center">Ejecuta y pon tu token cuando lo pida</span>
+            </div>
+          </div>
         </div>
 
         {/* Method 2: Script Python (advanced) */}
