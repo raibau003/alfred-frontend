@@ -422,14 +422,29 @@ export default function SettingsPage() {
           Permite que Alfred navegue internet usando tu computador. Necesario para Lider, bancos y sitios con Cloudflare.
         </p>
 
-        {/* Method 1: Chrome Extension (coming soon) */}
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-2">
+        {/* Method 1: Chrome Extension */}
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3">
           <div className="flex items-center gap-2">
             <span className="text-sm">🧩</span>
             <p className="text-xs font-medium text-blue-900">Extension de Chrome (recomendado)</p>
-            <span className="rounded bg-yellow-100 px-1.5 py-0.5 text-[9px] font-bold text-yellow-700">PRONTO</span>
           </div>
-          <p className="text-[10px] text-blue-700">Instala la extension desde Chrome Web Store y Alfred podra navegar usando tu browser. Sin configuracion.</p>
+          <p className="text-[10px] text-blue-700">Instala la extension en Chrome y Alfred podra navegar usando tu browser.</p>
+          <div className="rounded-lg bg-white/60 p-3 space-y-2">
+            <p className="text-[10px] font-medium text-blue-900">Como instalar:</p>
+            <ol className="text-[10px] text-blue-700 space-y-1 list-decimal list-inside">
+              <li>Descarga el archivo ZIP</li>
+              <li>Abre Chrome → <code className="bg-blue-100 px-1 rounded">chrome://extensions</code></li>
+              <li>Activa &ldquo;Modo desarrollador&rdquo; (arriba a la derecha)</li>
+              <li>Arrastra el ZIP o haz click &ldquo;Cargar descomprimida&rdquo;</li>
+              <li>Click en el icono de Alfred en la barra → pon tu token → Conectar</li>
+            </ol>
+          </div>
+          <div className="flex items-center gap-2">
+            <a href="/alfred-bridge-extension.zip" download className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-700">
+              <Download className="h-3.5 w-3.5" /> Descargar Extension
+            </a>
+            <span className="text-[10px] text-blue-500">7 KB</span>
+          </div>
         </div>
 
         {/* Method 2: Script Python (advanced) */}
