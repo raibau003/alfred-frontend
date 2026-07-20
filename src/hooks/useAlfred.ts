@@ -96,49 +96,67 @@ export function useAlfred(threadId?: string) {
     [user, currentThreadId]
   );
 
-  // Poll for responses
+  // Poll for responses — update progress live, detect final response
   const startPolling = useCallback(
     (userMsgCount: number) => {
       if (pollRef.current) clearInterval(pollRef.current);
+      let lastContent = "";
+      let stableCount = 0;
 
       pollRef.current = setInterval(async () => {
         if (!sessionRef.current) return;
         const msgs = await getMessages(sessionRef.current);
-        if (msgs.length <= userMsgCount) return; // No new messages yet
 
-        // Find new assistant messages
-        const newMsgs = msgs.slice(userMsgCount);
-        const assistantMsgs = newMsgs.filter((m) => m.role === "assistant");
+        // Get all assistant messages after the user's message
+        const assistantMsgs = msgs.filter((m, i) => m.role === "assistant" && i >= userMsgCount - 1);
+        if (assistantMsgs.length === 0) return;
 
-        if (assistantMsgs.length > 0) {
-          const lastMsg = assistantMsgs[assistantMsgs.length - 1];
+        const lastMsg = assistantMsgs[assistantMsgs.length - 1];
+        const PROGRESS_RE = /^(buscando|revisando|consultando|ejecutando|procesando|analizando|conectando|obteniendo|cargando|trabajando)/i;
+        const isProgress = PROGRESS_RE.test(lastMsg.text.trim()) || lastMsg.text.endsWith("...");
 
-          // Check if this is a "done" response (not just progress)
-          // Wait one more poll to confirm no more messages coming
-          if (msgs.length === msgCountRef.current) {
-            // Same count as last poll — response is stable
-            if (pollRef.current) clearInterval(pollRef.current);
-            setBusy(false);
-
-            // Add assistant message(s)
-            for (const am of assistantMsgs) {
-              const chatMsg: ChatMessage = {
-                id: `a-${Date.now()}-${Math.random()}`,
-                role: "assistant",
-                content: am.text,
-                agent: am.agent,
-                timestamp: new Date(),
-                rich: am.rich || undefined,
-              };
-              setMessages((prev) => {
-                // Avoid duplicates
-                if (prev.some((p) => p.content === am.text && p.role === "assistant")) return prev;
-                return [...prev, chatMsg];
-              });
-              saveMessage("assistant", am.text, am.agent);
+        // Update progress message in chat (replace the dots/progress)
+        if (isProgress) {
+          setMessages((prev) => {
+            const existing = prev.find(p => p.id === "progress");
+            if (existing) {
+              return prev.map(p => p.id === "progress" ? { ...p, content: lastMsg.text } : p);
             }
-          }
-          msgCountRef.current = msgs.length;
+            return [...prev, { id: "progress", role: "assistant" as const, content: lastMsg.text, timestamp: new Date() }];
+          });
+          stableCount = 0;
+          lastContent = lastMsg.text;
+          return;
+        }
+
+        // Non-progress text — check if stable (same content 2 polls in a row)
+        if (lastMsg.text === lastContent) {
+          stableCount++;
+        } else {
+          stableCount = 0;
+          lastContent = lastMsg.text;
+        }
+
+        if (stableCount >= 1) {
+          // Stable — this is the final response
+          if (pollRef.current) clearInterval(pollRef.current);
+          setBusy(false);
+
+          // Remove progress message and add final response
+          setMessages((prev) => {
+            const withoutProgress = prev.filter(p => p.id !== "progress");
+            // Avoid duplicates
+            if (withoutProgress.some(p => p.content === lastMsg.text && p.role === "assistant")) return withoutProgress;
+            return [...withoutProgress, {
+              id: `a-${Date.now()}`,
+              role: "assistant" as const,
+              content: lastMsg.text,
+              agent: lastMsg.agent,
+              timestamp: new Date(),
+              rich: lastMsg.rich || undefined,
+            }];
+          });
+          saveMessage("assistant", lastMsg.text, lastMsg.agent);
         }
       }, 2000);
     },
