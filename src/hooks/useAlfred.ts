@@ -22,7 +22,7 @@ export function useAlfred(threadId?: string) {
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(threadId ?? null);
   const sessionRef = useRef<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const msgCountRef = useRef(0);
+  const seenTextsRef = useRef<Set<string>>(new Set());
 
   // Load existing messages from Supabase if threadId provided
   useEffect(() => {
@@ -35,15 +35,13 @@ export function useAlfred(threadId?: string) {
       .order("created_at", { ascending: true })
       .then(({ data }) => {
         if (data) {
-          setMessages(
-            data.map((m) => ({
-              id: String(m.id),
-              role: m.role as "user" | "assistant",
-              content: m.content,
-              agent: m.agent ?? undefined,
-              timestamp: new Date(m.created_at),
-            }))
-          );
+          setMessages(data.map((m) => ({
+            id: String(m.id),
+            role: m.role as "user" | "assistant",
+            content: m.content,
+            agent: m.agent ?? undefined,
+            timestamp: new Date(m.created_at),
+          })));
         }
       });
   }, [threadId]);
@@ -70,8 +68,6 @@ export function useAlfred(threadId?: string) {
     async (role: "user" | "assistant", content: string, agent?: string) => {
       if (!user) return;
       const supabase = createClient();
-
-      // Create thread if needed
       let tid = currentThreadId;
       if (!tid) {
         const { data } = await supabase
@@ -85,7 +81,6 @@ export function useAlfred(threadId?: string) {
         }
       }
       if (!tid) return;
-
       await supabase.from("conversation_messages").insert({
         thread_id: tid,
         role,
@@ -96,67 +91,42 @@ export function useAlfred(threadId?: string) {
     [user, currentThreadId]
   );
 
-  // Poll for responses — update progress live, detect final response
+  // Simple polling: show ALL new assistant messages as they appear
   const startPolling = useCallback(
-    (userMsgCount: number) => {
+    () => {
       if (pollRef.current) clearInterval(pollRef.current);
-      let lastContent = "";
-      let stableCount = 0;
 
       pollRef.current = setInterval(async () => {
         if (!sessionRef.current) return;
         const msgs = await getMessages(sessionRef.current);
 
-        // Get all assistant messages after the user's message
-        const assistantMsgs = msgs.filter((m, i) => m.role === "assistant" && i >= userMsgCount - 1);
-        if (assistantMsgs.length === 0) return;
+        // Find assistant messages we haven't shown yet
+        let hasNew = false;
+        for (const msg of msgs) {
+          if (msg.role !== "assistant") continue;
+          if (seenTextsRef.current.has(msg.text)) continue;
 
-        const lastMsg = assistantMsgs[assistantMsgs.length - 1];
-        const PROGRESS_RE = /^(buscando|revisando|consultando|ejecutando|procesando|analizando|conectando|obteniendo|cargando|trabajando)/i;
-        const isProgress = PROGRESS_RE.test(lastMsg.text.trim()) || lastMsg.text.endsWith("...");
+          seenTextsRef.current.add(msg.text);
+          hasNew = true;
 
-        // Update progress message in chat (replace the dots/progress)
-        if (isProgress) {
-          setMessages((prev) => {
-            const existing = prev.find(p => p.id === "progress");
-            if (existing) {
-              return prev.map(p => p.id === "progress" ? { ...p, content: lastMsg.text } : p);
-            }
-            return [...prev, { id: "progress", role: "assistant" as const, content: lastMsg.text, timestamp: new Date() }];
-          });
-          stableCount = 0;
-          lastContent = lastMsg.text;
-          return;
-        }
+          const chatMsg: ChatMessage = {
+            id: `a-${Date.now()}-${Math.random()}`,
+            role: "assistant",
+            content: msg.text,
+            agent: msg.agent,
+            timestamp: new Date(),
+            rich: msg.rich || undefined,
+          };
+          setMessages((prev) => [...prev, chatMsg]);
 
-        // Non-progress text — check if stable (same content 2 polls in a row)
-        if (lastMsg.text === lastContent) {
-          stableCount++;
-        } else {
-          stableCount = 0;
-          lastContent = lastMsg.text;
-        }
-
-        if (stableCount >= 1) {
-          // Stable — this is the final response
-          if (pollRef.current) clearInterval(pollRef.current);
-          setBusy(false);
-
-          // Remove progress message and add final response
-          setMessages((prev) => {
-            const withoutProgress = prev.filter(p => p.id !== "progress");
-            // Avoid duplicates
-            if (withoutProgress.some(p => p.content === lastMsg.text && p.role === "assistant")) return withoutProgress;
-            return [...withoutProgress, {
-              id: `a-${Date.now()}`,
-              role: "assistant" as const,
-              content: lastMsg.text,
-              agent: lastMsg.agent,
-              timestamp: new Date(),
-              rich: lastMsg.rich || undefined,
-            }];
-          });
-          saveMessage("assistant", lastMsg.text, lastMsg.agent);
+          // If it's NOT a progress message, save it
+          const isProgress = /\.\.\.$|^(buscando|revisando|consultando|ejecutando|procesando)/i.test(msg.text.trim());
+          if (!isProgress) {
+            saveMessage("assistant", msg.text, msg.agent);
+            // Final response received — stop polling
+            if (pollRef.current) clearInterval(pollRef.current);
+            setBusy(false);
+          }
         }
       }, 2000);
     },
@@ -167,7 +137,7 @@ export function useAlfred(threadId?: string) {
     async (text: string) => {
       if (!text.trim()) return;
 
-      // Add optimistic user message FIRST (always show what user typed)
+      // Add optimistic user message
       const userMsg: ChatMessage = {
         id: `u-${Date.now()}`,
         role: "user",
@@ -180,28 +150,29 @@ export function useAlfred(threadId?: string) {
       if (!sessionRef.current) {
         await initSession();
       }
-      if (!sessionRef.current) return; // Still no session — Router might be down
-      saveMessage("user", text);
+      if (!sessionRef.current) return;
 
+      saveMessage("user", text);
       setBusy(true);
-      msgCountRef.current = 0;
+      seenTextsRef.current.clear();
 
       try {
         await sendPrompt(sessionRef.current, text);
-        // Count current messages to know where new ones start
-        const currentMsgs = await getMessages(sessionRef.current);
-        startPolling(currentMsgs.length);
+        startPolling();
       } catch {
         setBusy(false);
       }
     },
-    [busy, saveMessage, startPolling]
+    [saveMessage, startPolling, initSession]
   );
 
   const newThread = useCallback(() => {
     setMessages([]);
     setCurrentThreadId(null);
     sessionRef.current = null;
+    seenTextsRef.current.clear();
+    if (pollRef.current) clearInterval(pollRef.current);
+    setBusy(false);
     initSession();
   }, [initSession]);
 
