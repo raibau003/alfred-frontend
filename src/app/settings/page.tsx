@@ -354,15 +354,15 @@ export default function SettingsPage() {
           </div>
 
           {/* Telegram */}
-          <div className={`rounded-lg border p-4 space-y-3 ${tgConnected ? "border-[#0a1628]/20 bg-[#0a1628]/5" : "border-slate-200"}`}>
+          <div className={`rounded-lg border p-4 space-y-3 ${tgConnected ? "border-green-200 bg-green-50" : "border-slate-200"}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Send className={`h-4 w-4 ${tgConnected ? "text-[#0a1628]" : "text-slate-400"}`} />
+                <Send className={`h-4 w-4 ${tgConnected ? "text-green-600" : "text-slate-400"}`} />
                 <span className="text-sm font-medium text-slate-900">Telegram</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className={`inline-block h-2 w-2 rounded-full ${tgConnected ? "bg-[#0a1628]/50" : "bg-slate-300"}`} />
-                <span className={`text-xs ${tgConnected ? "text-[#0a1628]" : "text-slate-400"}`}>
+                <span className={`inline-block h-2 w-2 rounded-full ${tgConnected ? "bg-green-500" : "bg-slate-300"}`} />
+                <span className={`text-xs ${tgConnected ? "text-green-600" : "text-slate-400"}`}>
                   {tgConnected ? "Conectado" : "No configurado"}
                 </span>
               </div>
@@ -384,7 +384,7 @@ export default function SettingsPage() {
 
             {tgConnected && tgBotName && (
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[#0a1628]">Bot: @{tgBotName}</span>
+                <span className="text-xs text-green-700">Bot: @{tgBotName}</span>
                 <button
                   onClick={async () => {
                     const supabase = createClient();
