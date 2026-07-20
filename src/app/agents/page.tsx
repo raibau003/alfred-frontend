@@ -19,6 +19,7 @@ const categoryConfig: Record<string, { label: string; color: string; icon: typeo
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [filter, setFilter] = useState<string | null>(null);
+  const [agentStats, setAgentStats] = useState<Record<string, { count: number; avgTime: number }>>({});
 
   useEffect(() => {
     const supabase = createClient();
@@ -29,6 +30,25 @@ export default function AgentsPage() {
       .order("category")
       .then(({ data }) => {
         if (data) setAgents(data);
+      });
+    // Load usage stats from conversations
+    supabase
+      .from("conversations")
+      .select("agent,duration_ms")
+      .then(({ data }) => {
+        if (!data) return;
+        const stats: Record<string, { count: number; totalDur: number }> = {};
+        for (const c of data) {
+          if (!c.agent) continue;
+          if (!stats[c.agent]) stats[c.agent] = { count: 0, totalDur: 0 };
+          stats[c.agent].count++;
+          stats[c.agent].totalDur += c.duration_ms || 0;
+        }
+        const result: Record<string, { count: number; avgTime: number }> = {};
+        for (const [k, v] of Object.entries(stats)) {
+          result[k] = { count: v.count, avgTime: v.count > 0 ? Math.round(v.totalDur / v.count / 1000) : 0 };
+        }
+        setAgentStats(result);
       });
   }, []);
 
@@ -138,7 +158,13 @@ export default function AgentsPage() {
               <p className="mt-2 text-xs text-slate-500 line-clamp-2">{agent.description}</p>
 
               <div className="mt-3 flex items-center gap-3 text-[10px] text-slate-400">
-                <span className="font-mono">{agent.id}</span>
+                {agentStats[agent.id] && (
+                  <>
+                    <span>{agentStats[agent.id].count} usos</span>
+                    <span>~{agentStats[agent.id].avgTime}s</span>
+                  </>
+                )}
+                {!agentStats[agent.id] && <span>Sin uso</span>}
                 {agent.is_custom && <span className="rounded bg-yellow-50 px-1.5 py-0.5 text-yellow-600 border border-yellow-200">Custom</span>}
               </div>
             </Link>
