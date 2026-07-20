@@ -7,6 +7,10 @@ import remarkGfm from "remark-gfm";
 import type { ChatMessage } from "@/hooks/useAlfred";
 import { ProductCards } from "./rich/ProductCards";
 import { ActionButtons } from "./rich/ActionButtons";
+import { ComparisonTable } from "./rich/ComparisonTable";
+import { CartView } from "./rich/CartView";
+import { StoreComparison } from "./rich/StoreComparison";
+import { BridgePrompt } from "./rich/BridgePrompt";
 
 interface Props {
   messages: ChatMessage[];
@@ -16,9 +20,10 @@ interface Props {
   userName: string;
   onToggleThreads?: () => void;
   showThreadsButton?: boolean;
+  shoppingMode?: boolean;
 }
 
-export function ChatView({ messages, busy, connected, onSend, userName, onToggleThreads, showThreadsButton }: Props) {
+export function ChatView({ messages, busy, connected, onSend, userName, onToggleThreads, showThreadsButton, shoppingMode }: Props) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -103,14 +108,21 @@ export function ChatView({ messages, busy, connected, onSend, userName, onToggle
               Soy Alfred, tu asistente personal. Preguntame lo que necesites.
             </p>
             <div className="grid grid-cols-2 gap-2 max-w-lg w-full">
-              {[
+              {(shoppingMode ? [
+                { q: "Busca leche en los supermercados", icon: "🥛" },
+                { q: "Arma lista para un asado de 8 personas", icon: "🥩" },
+                { q: "Busca aceite de oliva y compara precios", icon: "🫒" },
+                { q: "Que necesito comprar para la semana?", icon: "📋" },
+                { q: "Busca detergente y papel higienico", icon: "🧹" },
+                { q: "Donde esta mas barato el cafe?", icon: "☕" },
+              ] : [
                 { q: "Que reuniones tengo manana?", icon: "📅" },
                 { q: "Cuanto debo de luz?", icon: "💡" },
                 { q: "Busca leche en los supers", icon: "🛒" },
                 { q: "Que ejercicio hago hoy?", icon: "💪" },
                 { q: "Busca vuelos a Buenos Aires", icon: "✈️" },
                 { q: "Rinde mis gastos de julio", icon: "🧾" },
-              ].map(({ q, icon }) => (
+              ]).map(({ q, icon }) => (
                 <button
                   key={q}
                   onClick={() => onSend(q)}
@@ -163,6 +175,18 @@ export function ChatView({ messages, busy, connected, onSend, userName, onToggle
                   <>
                     {msg.rich.type === "product_list" && msg.rich.products && (
                       <ProductCards products={msg.rich.products} onAction={onSend} />
+                    )}
+                    {msg.rich.type === "comparison" && msg.rich.comparisons && (
+                      <ComparisonTable product={msg.rich.product || ""} comparisons={msg.rich.comparisons} onAction={onSend} />
+                    )}
+                    {msg.rich.type === "cart" && msg.rich.items && (
+                      <CartView items={msg.rich.items} onAction={onSend} />
+                    )}
+                    {msg.rich.type === "store_comparison" && msg.rich.stores && (
+                      <StoreComparison stores={msg.rich.stores} onAction={onSend} />
+                    )}
+                    {msg.rich.type === "bridge_prompt" && (
+                      <BridgePrompt store={msg.rich.store || ""} checkoutUrl={msg.rich.checkout_url} onAction={onSend} />
                     )}
                     {msg.rich.type === "action_buttons" && msg.rich.actions && (
                       <ActionButtons actions={msg.rich.actions} onAction={onSend} />
