@@ -202,80 +202,13 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
                       })()}
                       {/* Regular markdown content (if no progress bar) */}
                       {!msg.content.match(/\d+%.*restantes/) && (() => {
-                        // Skip inline product parsing if rich content already provides products
-                        if (msg.rich?.type === "product_list" && msg.rich?.products?.length > 0) {
-                          const cleanContent = msg.content.replace(/```json[\s\S]*?```/g, "").trim();
-                          return (
-                            <div className="prose prose-sm prose-slate max-w-none [&_table]:text-xs [&_th]:px-2 [&_td]:px-2 [&_h2]:text-sm [&_h3]:text-sm [&_p]:my-1">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanContent}</ReactMarkdown>
-                            </div>
-                          );
-                        }
-                        // Try to extract products from response (JSON or markdown table)
-                        let products: any[] = [];
-                        let cleanContent = msg.content;
-
-                        // Method 1: JSON block
-                        const jsonMatch = msg.content.match(/```json\s*([\s\S]*?)```/);
-                        if (jsonMatch) {
-                          try {
-                            const parsed = JSON.parse(jsonMatch[1]);
-                            if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].price !== undefined) {
-                              products = parsed;
-                              cleanContent = msg.content.replace(/```json[\s\S]*?```/, "").trim();
-                            }
-                          } catch {}
-                        }
-
-                        // Method 2: Parse markdown table with prices ($X.XXX pattern)
-                        if (products.length === 0 && msg.content.includes("$") && msg.content.includes("|")) {
-                          const lines = msg.content.split("\n");
-                          // Find table header to detect store columns
-                          const headerLine = lines.find(l => l.includes("|") && (l.toLowerCase().includes("producto") || l.toLowerCase().includes("jumbo") || l.toLowerCase().includes("lider")));
-                          if (headerLine) {
-                            const headers = headerLine.split("|").map(h => h.trim().toLowerCase()).filter(Boolean);
-                            const stores = headers.filter(h => ["jumbo","lider","unimarc","tottus","santa isabel","mercadolibre"].some(s => h.includes(s)));
-
-                            // Parse data rows
-                            for (const line of lines) {
-                              if (!line.includes("$") || !line.includes("|")) continue;
-                              if (line.includes("---")) continue;
-                              const cols = line.split("|").map(c => c.trim()).filter(Boolean);
-                              if (cols.length < 2) continue;
-                              const productName = cols[0]?.replace(/\*\*/g, "").trim();
-                              if (!productName || productName.toLowerCase().includes("producto")) continue;
-
-                              // Extract prices from each store column
-                              for (let ci = 1; ci < cols.length && ci - 1 < stores.length; ci++) {
-                                const cell = cols[ci];
-                                const priceMatch = cell.match(/\$([0-9.,]+)/);
-                                if (priceMatch) {
-                                  const price = parseInt(priceMatch[1].replace(/\./g, "").replace(",", ""));
-                                  if (price > 0) {
-                                    products.push({
-                                      name: productName,
-                                      price,
-                                      store: stores[ci - 1] || headers[ci] || "super",
-                                      available: !cell.includes("–") && !cell.includes("-"),
-                                      original_price: cell.includes("oferta") || cell.includes("antes") ? price + 200 : undefined,
-                                    });
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-
-                        // Sort by price
-                        products.sort((a, b) => a.price - b.price);
+                        // Clean JSON blocks from display text
+                        const cleanContent = msg.content.replace(/```json[\s\S]*?```/g, "").trim();
 
                         return (
-                          <>
-                            <div className="prose prose-sm prose-slate max-w-none [&_table]:text-xs [&_th]:px-2 [&_td]:px-2 [&_h2]:text-sm [&_h3]:text-sm [&_p]:my-1">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanContent}</ReactMarkdown>
-                            </div>
-                            {products.length >= 3 && <ProductCarousel products={products} onAction={onSend} />}
-                          </>
+                          <div className="prose prose-sm prose-slate max-w-none [&_table]:text-xs [&_th]:px-2 [&_td]:px-2 [&_h2]:text-sm [&_h3]:text-sm [&_p]:my-1">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanContent}</ReactMarkdown>
+                          </div>
                         );
                       })()}
                     </div>
