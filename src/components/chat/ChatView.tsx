@@ -11,6 +11,9 @@ import { ActionButtons } from "./rich/ActionButtons";
 import { ComparisonTable } from "./rich/ComparisonTable";
 import { CartView } from "./rich/CartView";
 import { ShoppingCart } from "./rich/ShoppingCart";
+import { ShoppingCart as ShoppingCartIcon, X as XIcon } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { StoreComparison } from "./rich/StoreComparison";
 import { BridgePrompt } from "./rich/BridgePrompt";
 
@@ -30,8 +33,33 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
   const [input, setInput] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [reactions, setReactions] = useState<Record<string, "up" | "down">>({});
+  const [cartOpen, setCartOpen] = useState(false);
+  const [cartItems, setCartItems] = useState<any[]>([]);
+  const [cartLoading, setCartLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const { user } = useAuth();
+
+  // Load cart from Supabase
+  const loadCart = async () => {
+    if (!user?.id) return;
+    setCartLoading(true);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("shopping_list")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    setCartItems(data || []);
+    setCartLoading(false);
+  };
+
+  // Reload cart when messages change (might have added items)
+  useEffect(() => {
+    if (cartOpen) loadCart();
+  }, [messages.length, cartOpen]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -97,6 +125,16 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
         </div>
         <div className="flex items-center gap-3">
           <button
+            onClick={() => { setCartOpen(!cartOpen); if (!cartOpen) loadCart(); }}
+            className={`relative flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] transition-colors ${cartOpen ? "border-[#e8864a] bg-[#e8864a]/10 text-[#e8864a]" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}
+            title="Carro de compras"
+          >
+            <ShoppingCartIcon className="h-3.5 w-3.5" />
+            {cartItems.length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#e8864a] text-[8px] font-bold text-white">{cartItems.length}</span>
+            )}
+          </button>
+          <button
             onClick={() => onSend("")}
             className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[10px] text-slate-500 hover:bg-slate-50"
             title="Nueva conversacion"
@@ -110,6 +148,45 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
           </div>
         </div>
       </div>
+
+      {/* Cart panel */}
+      {cartOpen && (
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 max-h-[40vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+              <ShoppingCartIcon className="h-4 w-4 text-[#e8864a]" />
+              Carro de Compras ({cartItems.length})
+            </h3>
+            <button onClick={() => setCartOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <XIcon className="h-4 w-4" />
+            </button>
+          </div>
+          {cartLoading ? (
+            <p className="text-xs text-slate-400">Cargando...</p>
+          ) : cartItems.length === 0 ? (
+            <p className="text-xs text-slate-400">Tu carro esta vacio. Busca productos y haz click en "Agregar".</p>
+          ) : (
+            <>
+              <ShoppingCart
+                items={cartItems.map(i => ({ name: i.product_name, price: i.price, store: i.store, quantity: i.quantity || 1 }))}
+                onAction={onSend}
+              />
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={async () => {
+                    const supabase = createClient();
+                    await supabase.from("shopping_list").delete().eq("user_id", user?.id).eq("status", "pending");
+                    setCartItems([]);
+                  }}
+                  className="px-3 py-1 text-[10px] text-red-500 border border-red-200 rounded-lg hover:bg-red-50"
+                >
+                  Vaciar carro
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
