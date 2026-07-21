@@ -10,6 +10,7 @@ import { ProductCarousel } from "./rich/ProductCarousel";
 import { ActionButtons } from "./rich/ActionButtons";
 import { ComparisonTable } from "./rich/ComparisonTable";
 import { CartView } from "./rich/CartView";
+import { ShoppingCart } from "./rich/ShoppingCart";
 import { StoreComparison } from "./rich/StoreComparison";
 import { BridgePrompt } from "./rich/BridgePrompt";
 
@@ -228,6 +229,9 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
                     )}
                     {msg.rich.type === "cart" && msg.rich.items && (
                       <CartView items={msg.rich.items} onAction={onSend} />
+                    )}
+                    {msg.rich.type === "shopping_cart" && msg.rich.items && (
+                      <ShoppingCart items={msg.rich.items} onAction={onSend} />
                     )}
                     {msg.rich.type === "store_comparison" && msg.rich.stores && (
                       <StoreComparison stores={msg.rich.stores} onAction={onSend} />
