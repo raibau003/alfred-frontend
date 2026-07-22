@@ -147,20 +147,38 @@ export function useAlfred(threadId?: string) {
           }
 
           // PRIMARY: Router says "done" or "stopped" = we're done
+          const isProgress = (t: string) => t.endsWith("...") || t.includes("% (~") || t.includes("restantes)") || /^\s*(buscando|revisando|consultando|ejecutando|procesando|trabajando|alfred sigue)/i.test(t);
+
           if (status === "done" || status === "stopped") {
             foundFinal = true;
             if (pollRef.current) clearInterval(pollRef.current);
             setBusy(false);
             setMessages(prev => prev.filter(m => !m.id.startsWith("hb-")));
-            // Save last real response
-            const isProgress = (t: string) => t.endsWith("...") || t.includes("% (~") || t.includes("restantes)") || /^\s*(buscando|revisando|consultando|ejecutando|procesando|trabajando|alfred sigue)/i.test(t);
+            const lastReal = msgs.filter(m => m.role === "assistant" && m.text.length > 30 && !isProgress(m.text)).pop();
+            if (lastReal) saveMessage("assistant", lastReal.text, lastReal.agent);
+            return;
+          }
+
+          // SECONDARY: if we have a real response (not progress) + msgs stable for 3 polls = done
+          if (msgs.length === lastMsgCount && msgs.length > 0) {
+            stablePolls++;
+          } else {
+            stablePolls = 0;
+            lastMsgCount = msgs.length;
+          }
+
+          const hasRealResponse = msgs.some(m => m.role === "assistant" && m.text.length > 50 && !isProgress(m.text));
+          if (hasRealResponse && stablePolls >= 3) {
+            foundFinal = true;
+            if (pollRef.current) clearInterval(pollRef.current);
+            setBusy(false);
+            setMessages(prev => prev.filter(m => !m.id.startsWith("hb-")));
             const lastReal = msgs.filter(m => m.role === "assistant" && m.text.length > 30 && !isProgress(m.text)).pop();
             if (lastReal) saveMessage("assistant", lastReal.text, lastReal.agent);
             return;
           }
 
           // Safety: after 5 min of polling, stop
-          stablePolls++;
           if (stablePolls > 150) {
             if (pollRef.current) clearInterval(pollRef.current);
             setBusy(false);
