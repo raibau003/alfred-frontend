@@ -29,6 +29,68 @@ interface Props {
   shoppingMode?: boolean;
 }
 
+// Extracts search terms from user message (split by commas, "y", newlines)
+function extractSearchTerms(text: string): string[] {
+  const cleaned = text
+    .replace(/^(busca|buscar|necesito|quiero|comprar|compra|precio|precios|comparar|compara|cotizar|cotiza|dame|encuentra|busqueda de|todo esto|esto)\s*/gi, "")
+    .replace(/\s+(en los supers|en supermercados|en el super|en el lider|en jumbo|en unimarc|en tottus|en santa isabel)\s*/gi, "")
+    .replace(/\s*(arma|deja|dejalo|listo|computador|carro|carrito|lista).*$/gi, "")
+    .trim();
+  const terms = cleaned
+    .split(/\s+y\s+|,\s*|\s*\+\s*|\n+/i)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 2);
+  return terms;
+}
+
+// Groups products by which search term they best match
+function groupProductsBySearchTerm(
+  products: any[],
+  searchTerms: string[]
+): { term: string; products: any[] }[] {
+  if (searchTerms.length <= 1) return [{ term: "", products }];
+
+  const groups: Record<string, any[]> = {};
+  const unmatched: any[] = [];
+
+  for (const term of searchTerms) {
+    groups[term] = [];
+  }
+
+  for (const product of products) {
+    const pName = (product.name || "").toLowerCase();
+    let bestTerm = "";
+    let bestScore = 0;
+    for (const term of searchTerms) {
+      const tLower = term.toLowerCase();
+      // Check if any word in the search term appears in the product name
+      const words = tLower.split(/\s+/);
+      let score = 0;
+      for (const w of words) {
+        if (w.length > 2 && pName.includes(w)) score += w.length;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        bestTerm = term;
+      }
+    }
+    if (bestTerm && bestScore > 0) {
+      groups[bestTerm].push(product);
+    } else {
+      unmatched.push(product);
+    }
+  }
+
+  const result = searchTerms
+    .filter((t) => groups[t].length > 0)
+    .map((t) => ({ term: t, products: groups[t] }));
+
+  if (unmatched.length > 0) {
+    result.push({ term: "Otros", products: unmatched });
+  }
+  return result;
+}
+
 export function ChatView({ messages, busy, connected, onSend, onStop, userName, onToggleThreads, showThreadsButton, shoppingMode }: Props) {
   const [input, setInput] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -36,10 +98,17 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
   const [cartOpen, setCartOpen] = useState(false);
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [cartLoading, setCartLoading] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const { user } = useAuth();
+
+  // Show a temporary toast notification
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  };
 
   // Load cart from Supabase
   const loadCart = async () => {
@@ -56,10 +125,33 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
     setCartLoading(false);
   };
 
+  // Add product to cart directly via Supabase (no round-trip through Router)
+  const addToCartDirect = async (product: { name: string; price: number; store: string }, quantity: number) => {
+    if (!user?.id) return;
+    const supabase = createClient();
+    await supabase.from("shopping_list").insert({
+      user_id: user.id,
+      channel: "web",
+      product_name: product.name,
+      price: product.price,
+      store: product.store,
+      quantity,
+      status: "pending",
+    });
+    showToast(`${quantity}x ${product.name} agregado al carro`);
+    // Refresh cart count in header
+    loadCart();
+  };
+
   // Reload cart when messages change (might have added items)
   useEffect(() => {
     if (cartOpen) loadCart();
   }, [messages.length, cartOpen]);
+
+  // Always load cart count on mount to show badge
+  useEffect(() => {
+    loadCart();
+  }, [user?.id]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -298,9 +390,63 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
                 {/* Rich content */}
                 {msg.rich && msg.role === "assistant" && (
                   <>
-                    {msg.rich.type === "product_list" && msg.rich.products && (
-                      <ProductCarousel products={msg.rich.products} onAction={onSend} />
-                    )}
+                    {msg.rich.type === "product_list" && msg.rich.products && (() => {
+                      // Find the user message that triggered this response
+                      const msgIdx = messages.indexOf(msg);
+                      const prevUserMsg = messages.slice(0, msgIdx).reverse().find(m => m.role === "user");
+                      const userText = prevUserMsg?.content || "";
+                      const searchTerms = extractSearchTerms(userText);
+                      const isMultiProduct = searchTerms.length > 1 && msg.rich.products.length > 3;
+
+                      if (isMultiProduct) {
+                        const groups = groupProductsBySearchTerm(msg.rich.products, searchTerms);
+                        return (
+                          <div className="mt-3 space-y-4">
+                            <div className="flex items-center gap-2 px-1">
+                              <span className="text-xs font-bold text-[#0a1628]">
+                                {msg.rich.products.length} productos en {groups.length} categorias
+                              </span>
+                            </div>
+                            {groups.map((group, gi) => (
+                              <div key={gi} className="border border-slate-200 rounded-xl p-3 bg-white">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-sm">🔍</span>
+                                  <span className="text-xs font-bold text-slate-800 uppercase">{group.term}</span>
+                                  <span className="text-[10px] text-slate-400">({group.products.length} opciones)</span>
+                                </div>
+                                <ProductCarousel
+                                  products={group.products}
+                                  onAction={onSend}
+                                  compact
+                                  onAddToCart={(p, qty) => addToCartDirect(p, qty)}
+                                />
+                              </div>
+                            ))}
+                            {/* Global actions */}
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              <button onClick={() => onSend("arma el carro mas barato con todos los productos")} className="flex items-center gap-1 rounded-lg border border-[#0a1628]/20 bg-[#0a1628]/5 px-3 py-1.5 text-xs text-[#0a1628] hover:bg-slate-100">
+                                Lo mas barato
+                              </button>
+                              <button onClick={() => onSend("cual supermercado tiene todo mas barato en total")} className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50">
+                                Todo en 1 super
+                              </button>
+                              <button onClick={() => onSend("compara los precios de cada producto en todos los supermercados")} className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50">
+                                Comparar precios
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // Single product or few results — standard carousel
+                      return (
+                        <ProductCarousel
+                          products={msg.rich.products}
+                          onAction={onSend}
+                          onAddToCart={(p, qty) => addToCartDirect(p, qty)}
+                        />
+                      );
+                    })()}
                     {msg.rich.type === "comparison" && msg.rich.comparisons && (
                       <ComparisonTable product={msg.rich.product || ""} comparisons={msg.rich.comparisons} onAction={onSend} />
                     )}
@@ -420,6 +566,16 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
           </div>
         </div>
       </div>
+
+      {/* Toast notification */}
+      {toast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-2 rounded-xl bg-[#0a1628] px-4 py-2.5 text-sm text-white shadow-lg">
+            <span className="text-green-400">&#10003;</span>
+            <span>{toast}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
