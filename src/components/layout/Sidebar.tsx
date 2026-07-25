@@ -14,6 +14,7 @@ import {
   WifiOff,
   Loader2,
   FlaskConical,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -22,6 +23,7 @@ import { ROUTER_URL } from "@/lib/alfred/client";
 const navItems = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/recordatorios", label: "Recordatorios", icon: Bell },
   { href: "/agents", label: "Agentes", icon: Bot },
   { href: "/connectors", label: "Conectores", icon: Plug },
   { href: "/tester", label: "Tester", icon: FlaskConical },
