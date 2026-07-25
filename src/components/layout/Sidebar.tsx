@@ -17,6 +17,7 @@ import {
   Bell,
   Smartphone,
   Activity,
+  Music,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -28,6 +29,7 @@ const navItems = [
   { href: "/recordatorios", label: "Recordatorios", icon: Bell },
   { href: "/linea-alfred", label: "Línea de Alfred", icon: Smartphone },
   { href: "/observabilidad", label: "Observabilidad", icon: Activity },
+  { href: "/integraciones", label: "Integraciones", icon: Music },
   { href: "/agents", label: "Agentes", icon: Bot },
   { href: "/connectors", label: "Conectores", icon: Plug },
   { href: "/tester", label: "Tester", icon: FlaskConical },
