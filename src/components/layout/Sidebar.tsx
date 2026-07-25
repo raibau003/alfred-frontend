@@ -16,6 +16,7 @@ import {
   FlaskConical,
   Bell,
   Smartphone,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -26,6 +27,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/recordatorios", label: "Recordatorios", icon: Bell },
   { href: "/linea-alfred", label: "Línea de Alfred", icon: Smartphone },
+  { href: "/observabilidad", label: "Observabilidad", icon: Activity },
   { href: "/agents", label: "Agentes", icon: Bot },
   { href: "/connectors", label: "Conectores", icon: Plug },
   { href: "/tester", label: "Tester", icon: FlaskConical },
