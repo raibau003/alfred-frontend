@@ -131,6 +131,10 @@ export default function LineaAlfredPage() {
             className="mx-auto h-64 w-64 rounded-lg border border-slate-200"
           />
           <p className="mt-3 text-xs text-slate-400">El QR se refresca solo cada ~18s.</p>
+          <button onClick={stop} disabled={starting}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-50">
+            <Power className="h-4 w-4" /> Detener
+          </button>
         </div>
       )}
 
