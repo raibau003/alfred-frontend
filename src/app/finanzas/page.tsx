@@ -3,10 +3,11 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Wallet, TrendingUp, AlertTriangle, RefreshCw, Loader2, Download, Repeat, CreditCard,
-  Layers, Landmark, ArrowDownRight, ArrowUpRight, PiggyBank,
+  Layers, Landmark, ArrowDownRight, ArrowUpRight, PiggyBank, X,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine, Cell, PieChart, Pie, Legend,
+  ComposedChart, Line,
 } from "recharts";
 
 const clp = (n: number) => new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Math.round(n || 0));
@@ -42,7 +43,7 @@ type Dash = {
 };
 
 const PIE = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#64748b"];
-const TABS = ["Resumen", "Tarjetas", "Cuentas", "Categorías", "Evolución"] as const;
+const TABS = ["Resumen", "Tarjetas", "Cuentas", "Categorías", "Evolución", "Proyección"] as const;
 type Tab = typeof TABS[number];
 
 export default function FinanzasPage() {
@@ -231,9 +232,133 @@ export default function FinanzasPage() {
         </div>
       )}
 
+      {tab === "Proyección" && <ProyeccionTab />}
+
       <p className="mt-6 text-center text-xs text-slate-400">
         Alfred ingiere tus cartolas del correo y te avisa por WhatsApp de gastos nuevos o fuera de lo habitual.
       </p>
+    </div>
+  );
+}
+
+type Flujo = { nombre: string; monto: number };
+function ProyeccionTab() {
+  const [ingreso, setIngreso] = useState(0);
+  const [saldo0, setSaldo0] = useState(0);
+  const [ai, setAi] = useState(0); // % ajuste ingreso mensual
+  const [ae, setAe] = useState(0); // % ajuste egresos mensual
+  const [egresos, setEgresos] = useState<Flujo[]>([]);
+  const [defaults, setDefaults] = useState<{ ingresoMensual: number; egresos: Flujo[]; saldoInicial: number } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saved, setSaved] = useState(false);
+
+  const applyState = useCallback((s: { ingresoMensual?: number; egresos?: Flujo[]; saldoInicial?: number; ajusteIngreso?: number; ajusteEgreso?: number }) => {
+    setIngreso(s.ingresoMensual ?? 0); setEgresos(s.egresos ?? []); setSaldo0(s.saldoInicial ?? 0);
+    setAi(s.ajusteIngreso ?? 0); setAe(s.ajusteEgreso ?? 0);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const j = await fetch("/api/finance/projection", { cache: "no-store" }).then((r) => r.json());
+        setDefaults(j.defaults);
+        applyState(j.guardado || j.defaults);
+      } catch {} finally { setLoading(false); }
+    })();
+  }, [applyState]);
+
+  const totalEgr = egresos.reduce((a, e) => a + (Number(e.monto) || 0), 0);
+  const proj = useMemo(() => {
+    const now = new Date();
+    const rows: { mes: string; ingreso: number; egreso: number; resultado: number; saldo: number }[] = [];
+    let saldo = Number(saldo0) || 0;
+    for (let i = 0; i < 12; i++) {
+      const ing = Math.round((Number(ingreso) || 0) * Math.pow(1 + ai / 100, i));
+      const egr = Math.round(totalEgr * Math.pow(1 + ae / 100, i));
+      const res = ing - egr; saldo += res;
+      const d = new Date(now.getFullYear(), now.getMonth() + 1 + i, 1);
+      rows.push({ mes: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, ingreso: ing, egreso: egr, resultado: res, saldo });
+    }
+    return rows;
+  }, [ingreso, saldo0, ai, ae, totalEgr]);
+
+  const resultadoMensual = (Number(ingreso) || 0) - totalEgr;
+  const saldoFinal = proj[proj.length - 1]?.saldo ?? 0;
+
+  const save = async () => {
+    await fetch("/api/finance/projection", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cashflow: { ingresoMensual: Number(ingreso) || 0, egresos, saldoInicial: Number(saldo0) || 0, ajusteIngreso: ai, ajusteEgreso: ae } }) }).catch(() => {});
+    setSaved(true); setTimeout(() => setSaved(false), 2500);
+  };
+  const reset = () => defaults && applyState(defaults);
+  const setEgr = (i: number, patch: Partial<Flujo>) => setEgresos((e) => e.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const addEgr = () => setEgresos((e) => [...e, { nombre: "Nuevo gasto", monto: 0 }]);
+  const delEgr = (i: number) => setEgresos((e) => e.filter((_, j) => j !== i));
+
+  if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-5 w-5 animate-spin text-slate-300" /></div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <Kpi icon={<ArrowUpRight className="h-4 w-4" />} label="Ingreso mensual" value={clp(Number(ingreso) || 0)} color="text-emerald-600" />
+        <Kpi icon={<ArrowDownRight className="h-4 w-4" />} label="Egresos mensuales" value={clp(totalEgr)} color="text-slate-700" />
+        <Kpi icon={<PiggyBank className="h-4 w-4" />} label="Resultado / mes" value={clp(resultadoMensual)} color={resultadoMensual < 0 ? "text-red-600" : "text-emerald-600"} />
+      </div>
+
+      <Card title="Saldo proyectado · próximos 12 meses">
+        <div className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={proj} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+              <XAxis dataKey="mes" tickFormatter={(m) => mesLabel(m).slice(0, 3)} tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={clpShort} tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} width={44} />
+              <Tooltip formatter={(v) => clp(Number(v))} labelFormatter={(l) => mesLabel(String(l))} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
+              <ReferenceLine y={0} stroke="#94a3b8" />
+              <Bar dataKey="resultado" radius={[3, 3, 0, 0]}>{proj.map((r, i) => <Cell key={i} fill={r.resultado < 0 ? "#fca5a5" : "#a7f3d0"} />)}</Bar>
+              <Line type="monotone" dataKey="saldo" stroke="#4f46e5" strokeWidth={2} dot={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+        <p className={`mt-2 text-center text-sm font-medium ${saldoFinal < 0 ? "text-red-600" : "text-emerald-600"}`}>
+          Saldo proyectado a 12 meses: {clp(saldoFinal)} {resultadoMensual < 0 && <span className="text-red-500">· ojo: gastás más de lo que entra</span>}
+        </p>
+      </Card>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card title="Supuestos (editá los valores)">
+          <div className="space-y-2 text-sm">
+            <NumRow label="Ingreso mensual" value={ingreso} onChange={setIngreso} />
+            <NumRow label="Saldo inicial" value={saldo0} onChange={setSaldo0} />
+            <NumRow label="Ajuste ingreso %/mes" value={ai} onChange={setAi} small />
+            <NumRow label="Ajuste egresos %/mes" value={ae} onChange={setAe} small />
+          </div>
+        </Card>
+        <Card title="Egresos recurrentes (editá / agregá / quitá)">
+          <div className="space-y-1.5">
+            {egresos.map((e, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input value={e.nombre} onChange={(ev) => setEgr(i, { nombre: ev.target.value })} className="min-w-0 flex-1 rounded border border-slate-200 px-2 py-1 text-sm" />
+                <input value={e.monto} onChange={(ev) => setEgr(i, { monto: Number(ev.target.value.replace(/\D/g, "")) || 0 })} className="w-28 rounded border border-slate-200 px-2 py-1 text-right text-sm" />
+                <button onClick={() => delEgr(i)} className="text-slate-300 hover:text-red-500"><X className="h-4 w-4" /></button>
+              </div>
+            ))}
+            <button onClick={addEgr} className="mt-1 text-xs font-medium text-indigo-600 hover:underline">+ Agregar gasto</button>
+          </div>
+        </Card>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button onClick={save} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700">{saved ? "✓ Guardado" : "Guardar escenario"}</button>
+        <button onClick={reset} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">Volver a valores reales</button>
+        <p className="text-xs text-slate-400">Semilla: ingreso = promedio 3 meses · egresos = promedio 12 meses.</p>
+      </div>
+    </div>
+  );
+}
+function NumRow({ label, value, onChange, small }: { label: string; value: number; onChange: (n: number) => void; small?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-slate-600">{label}</span>
+      <input value={value} onChange={(e) => onChange(Number(e.target.value.replace(small ? /[^\d.-]/g : /\D/g, "")) || 0)}
+        className="w-32 rounded border border-slate-200 px-2 py-1 text-right text-sm" />
     </div>
   );
 }
