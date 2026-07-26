@@ -270,7 +270,7 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
           ) : (
             <>
               <ShoppingCart
-                items={cartItems.map(i => ({ name: i.product_name, price: i.price, store: i.store, quantity: i.quantity || 1 }))}
+                items={cartItems.map(i => ({ id: i.id, name: i.product_name, price: i.price, store: i.store, quantity: i.quantity || 1, product_url: (i as any).product_url }))}
                 onAction={onSend}
               />
               <div className="flex gap-2 mt-2">
@@ -466,7 +466,13 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
                       <CartView items={msg.rich.items} onAction={onSend} />
                     )}
                     {msg.rich.type === "shopping_cart" && msg.rich.items && (
-                      <ShoppingCart items={msg.rich.items} onAction={onSend} />
+                      <ShoppingCart
+                        items={msg.rich.items}
+                        onAction={onSend}
+                        productos={(msg.rich as any).products ?? messages.find(
+                          (m) => m.rich?.type === "product_list" && m.rich?.products?.length
+                        )?.rich?.products}
+                      />
                     )}
                     {msg.rich.type === "store_comparison" && msg.rich.stores && (
                       <StoreComparison stores={msg.rich.stores} onAction={onSend} />

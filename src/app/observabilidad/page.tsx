@@ -32,7 +32,9 @@ export default function ObservabilidadPage() {
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch(`${ROUTER_URL}/observability/summary`, { signal: AbortSignal.timeout(12000) });
+      // Vía el proxy propio: el endpoint del router exige credencial y el navegador no
+      // puede llevar el secreto de servidor sin exponerlo.
+      const r = await fetch(`/api/observabilidad`, { signal: AbortSignal.timeout(12000) });
       const d = await r.json();
       if (d.ok) { setData(d); setErr(false); } else setErr(true);
     } catch { setErr(true); }

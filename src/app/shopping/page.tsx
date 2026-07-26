@@ -5,7 +5,8 @@ import { useAlfred } from "@/hooks/useAlfred";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ChatView } from "@/components/chat/ChatView";
 import { createClient } from "@/lib/supabase/client";
-import { Puzzle, Download, Loader2, CheckCircle2, X, ShoppingBag } from "lucide-react";
+import { Puzzle, Download, Loader2, CheckCircle2, X, ShoppingBag, MessageSquare, Settings } from "lucide-react";
+import { ConfiguracionCompras } from "@/components/shopping/ConfiguracionCompras";
 
 type StoreProgress = Record<string, { name?: string; done: number; total: number; status: string; added?: number; failed?: number }>;
 
@@ -17,6 +18,9 @@ export default function ShoppingPage() {
   const [building, setBuilding] = useState(false);
   const [showInstall, setShowInstall] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  // Pestaña activa. La configuración (comuna, programas de socio, costos de despacho) era
+  // lo único que solo se podía tocar por WhatsApp o con un curl.
+  const [tab, setTab] = useState<"chat" | "config">("chat");
 
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearWatchdog = () => { if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; } };
@@ -91,6 +95,21 @@ export default function ShoppingPage() {
             <CheckCircle2 className="h-3 w-3" /> Extensión conectada
           </span>
         )}
+        {/* Pestañas: el chat sigue primero; la configuración deja de estar escondida. */}
+        <div className="ml-3 flex items-center gap-1">
+          {([["chat", "Chat", MessageSquare], ["config", "Configuración", Settings]] as const).map(([k, label, Icon]) => (
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                tab === k ? "bg-[#0a1628] text-white" : "text-slate-500 hover:bg-slate-100"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" /> {label}
+            </button>
+          ))}
+        </div>
+
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => setShowInstall(true)}
@@ -139,7 +158,7 @@ export default function ShoppingPage() {
       )}
 
       {/* Chat de compras */}
-      <div className="min-h-0 flex-1">
+      <div className={`min-h-0 flex-1 ${tab === "chat" ? "" : "hidden"}`}>
         <ChatView
           messages={alfred.messages}
           busy={alfred.busy}
@@ -150,6 +169,15 @@ export default function ShoppingPage() {
           onNewThread={() => alfred.newThread()}
         />
       </div>
+
+      {/* Configuración de compras: comuna, programas de socio, retiro, tiendas a evitar y
+          los costos de despacho — el dato que el optimizador no puede adivinar y que hasta
+          ahora solo se podía cargar por WhatsApp o con un curl. */}
+      {tab === "config" && (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <ConfiguracionCompras />
+        </div>
+      )}
 
       {/* Modal instalar extensión */}
       {showInstall && (
