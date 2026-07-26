@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   Wallet, TrendingUp, AlertTriangle, RefreshCw, Loader2, Download, Repeat, CreditCard,
-  ArrowUpRight, Pencil, Check, X, Layers,
+  ArrowUpRight, Pencil, Check, X, Layers, Scale,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine, Cell,
@@ -23,8 +23,8 @@ type Summary = {
   mesReferencia?: string;
   mesReferenciaLabel?: string;
   tarjeta?: {
-    pagoMes: number; presupuesto: number; pctUsado: number; disponible: number;
-    promedio: number; sobrepasa: boolean; serie: { mes: string; total: number }[];
+    pagoMes: number; mesLabel?: string; presupuesto: number; pctUsado: number; disponible: number;
+    promedio: number; sobrepasa: boolean; serie: { mes: string; total: number }[]; itemizado?: boolean;
   };
   resumen: {
     gastoMes: number; ingresoMes?: number; neto?: number; presupuesto: number; pctUsado: number; disponible: number;
@@ -32,6 +32,8 @@ type Summary = {
     mesActual: string; diaDelMes: number; diasMes: number;
   };
   tendencia: { mes: string; total: number }[];
+  eerr?: { mes: string; label: string; ingresos: number; egresos: number; resultado: number; acumulado?: number }[];
+  eerrCategorias?: { categoria: string; monto: number }[];
   categorias: { categoria: string; esteMes: number; promedio: number; sobrePromedio: boolean }[];
   suscripciones: { nombre: string; monto: number; categoria: string }[];
   totalSuscripciones: number;
@@ -138,10 +140,10 @@ export default function FinanzasPage() {
         <div className="mb-3 flex items-start justify-between">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-              Pago a tu tarjeta{mesLbl ? ` · ${mesLbl}` : ""}
+              Gasto de tarjeta{tc?.mesLabel ? ` · ${tc.mesLabel}` : ""}
             </p>
             <p className="mt-0.5 text-3xl font-bold text-slate-900">{clp(tc?.pagoMes ?? 0)}</p>
-            <p className="mt-0.5 text-xs text-slate-400">Lo que pagaste a la tarjeta ese mes (desde la cartola)</p>
+            <p className="mt-0.5 text-xs text-slate-400">Total de compras de la tarjeta (estado de cuenta itemizado)</p>
           </div>
           <div className="text-right">
             <div className="flex items-center justify-end gap-1 text-xs font-medium uppercase tracking-wide text-slate-400">
@@ -185,9 +187,11 @@ export default function FinanzasPage() {
             El pago de tarjeta de {mesLbl} superó el tope en <b>{clp((tc?.pagoMes ?? 0) - (tc?.presupuesto ?? 0))}</b>.
           </div>
         )}
-        <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-          ℹ️ La cartola muestra el <b>pago total</b> a la tarjeta, no cada compra. Para ver el detalle itemizado (Netflix, cuotas, cada gasto) hay que activar el <b>Estado de Cuenta de la Tarjeta</b> en el banco.
-        </p>
+        {tc?.itemizado && (
+          <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+            ✅ Detalle itemizado del estado de cuenta: cada compra, suscripciones y cuotas (abajo).
+          </p>
+        )}
       </div>
 
       {/* Flujo de la cuenta corriente (egresos del mes de referencia) */}
@@ -316,6 +320,40 @@ export default function FinanzasPage() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* EERR / Balance mensual (flujo de la cuenta) */}
+      {(data?.eerr?.length ?? 0) > 0 && (
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-5">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <Scale className="h-4 w-4 text-slate-500" /> EERR · balance mensual (cuenta corriente)
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-left text-xs text-slate-400">
+                  <th className="py-1.5 font-medium">Mes</th>
+                  <th className="py-1.5 text-right font-medium">Ingresos</th>
+                  <th className="py-1.5 text-right font-medium">Egresos</th>
+                  <th className="py-1.5 text-right font-medium">Resultado</th>
+                  <th className="py-1.5 text-right font-medium">Acumulado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data!.eerr!.map((e) => (
+                  <tr key={e.mes} className="border-b border-slate-50">
+                    <td className="py-1.5 capitalize text-slate-700">{e.label}</td>
+                    <td className="py-1.5 text-right text-emerald-700">{clp(e.ingresos)}</td>
+                    <td className="py-1.5 text-right text-slate-600">{clp(e.egresos)}</td>
+                    <td className={`py-1.5 text-right font-medium ${e.resultado < 0 ? "text-red-600" : "text-emerald-700"}`}>{clp(e.resultado)}</td>
+                    <td className={`py-1.5 text-right ${(e.acumulado ?? 0) < 0 ? "text-red-500" : "text-slate-500"}`}>{clp(e.acumulado ?? 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-xs text-slate-400">Ingresos (depósitos/transferencias recibidas) menos egresos (transferencias, pagos, débitos) de tu cuenta corriente. El pago a la tarjeta cuenta como egreso acá.</p>
         </div>
       )}
 
