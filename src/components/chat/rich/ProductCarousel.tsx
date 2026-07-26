@@ -92,7 +92,14 @@ export function ProductCarousel({ products, onAction, groupLabel, onAddToCart, c
       {/* Carousel */}
       <div ref={scrollRef} className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide" style={{ scrollbarWidth: "none" }}>
         {sorted.map((p, i) => {
-          const isCheapest = p.price === cheapest.price;
+          // `destaque` lo calcula el router: "precio" = el más barato en total,
+          // "unidad" = el mejor por unidad de medida (que puede costar MUCHO más).
+          // Distinguirlos importa: un papel de $17.143 se destacaba en verde por tener
+          // el mejor precio por rollo mientras el de $4.590 quedaba sin marcar.
+          const destaque = (p as any).destaque as "precio" | "unidad" | null | undefined;
+          const aviso = (p as any).aviso as string | null | undefined;
+          const isCheapest = destaque ? destaque === "precio" : p.price === cheapest.price;
+          const isBestUnit = destaque === "unidad";
           const storeKey = p.store.toLowerCase();
           const color = storeColors[storeKey] || "border-slate-200 bg-white";
           const logo = storeLogos[storeKey] || "🏪";
@@ -101,12 +108,22 @@ export function ProductCarousel({ products, onAction, groupLabel, onAddToCart, c
           return (
             <div
               key={i}
-              className={`flex-shrink-0 w-44 rounded-xl border-2 p-3 transition-shadow hover:shadow-lg ${isCheapest ? "border-green-400 bg-green-50 ring-2 ring-green-200" : color}`}
+              className={`flex-shrink-0 w-44 rounded-xl border-2 p-3 transition-shadow hover:shadow-lg ${
+                isCheapest ? "border-green-400 bg-green-50 ring-2 ring-green-200"
+                : isBestUnit ? "border-sky-300 bg-sky-50 ring-1 ring-sky-200"
+                : color
+              }`}
             >
-              {/* Cheapest badge */}
+              {/* Badge: verde solo para el más barato EN TOTAL; el mejor por unidad va
+                  en celeste y con su propia etiqueta, para no confundir una cosa con la otra. */}
               {isCheapest && (
                 <div className="text-center mb-1">
                   <span className="text-[8px] font-bold text-green-700 bg-green-200 px-2 py-0.5 rounded-full">MAS BARATO</span>
+                </div>
+              )}
+              {isBestUnit && !isCheapest && (
+                <div className="text-center mb-1">
+                  <span className="text-[8px] font-bold text-sky-700 bg-sky-200 px-2 py-0.5 rounded-full">MEJOR X UNIDAD</span>
                 </div>
               )}
 
@@ -127,6 +144,11 @@ export function ProductCarousel({ products, onAction, groupLabel, onAddToCart, c
 
               {/* Product name */}
               <p className="text-[11px] font-medium text-slate-900 line-clamp-2 leading-tight h-8">{p.name}</p>
+              {aviso && (
+                <p className="text-[9px] leading-snug text-orange-700 bg-orange-50 rounded px-1 py-0.5 mt-0.5" title={aviso}>
+                  ⚠️ {aviso}
+                </p>
+              )}
               {p.brand && <p className="text-[9px] text-slate-400">{p.brand}</p>}
 
               {/* Price */}
