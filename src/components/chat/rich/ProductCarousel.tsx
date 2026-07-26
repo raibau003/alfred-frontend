@@ -48,16 +48,26 @@ const storeColors: Record<string, string> = {
   mercadolibre: "border-purple-300 bg-purple-50",
 };
 
+type SortKey = "precio" | "unidad" | "relevancia";
+
 export function ProductCarousel({ products, onAction, groupLabel, onAddToCart, compact, searchTerm }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [addedIdx, setAddedIdx] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<SortKey>("precio");
 
   if (!products || products.length === 0) return null;
 
-  // Sort by price ascending
-  const sorted = [...products].sort((a, b) => a.price - b.price);
-  const cheapest = sorted[0];
+  // El "más barato" siempre se calcula por precio absoluto, sin importar el orden elegido.
+  const cheapest = [...products].reduce((min, p) => (p.price < min.price ? p : min), products[0]);
+  const hasUnit = products.some((p) => p.unit_price && p.unit_price > 0);
+  // Orden visible según el control: precio, precio por unidad, o relevancia (orden original).
+  const sorted =
+    sortBy === "relevancia"
+      ? [...products]
+      : sortBy === "unidad"
+        ? [...products].sort((a, b) => (a.unit_price || a.price) - (b.unit_price || b.price))
+        : [...products].sort((a, b) => a.price - b.price);
   // Qué producto buscar más alternativas: el término del grupo, o el nombre del más barato.
   const moreQuery = (searchTerm || groupLabel || sorted[0]?.name || "").replace(/^\d+\s+productos.*/i, "").trim() || sorted[0]?.name || "";
 
@@ -86,7 +96,25 @@ export function ProductCarousel({ products, onAction, groupLabel, onAddToCart, c
         <p className="text-xs font-semibold text-slate-700">
           {groupLabel ? groupLabel : `${sorted.length} productos encontrados`}
         </p>
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1.5">
+          {/* Orden: precio / precio por unidad / relevancia */}
+          {products.length > 1 && (
+            <div className="flex items-center rounded-full border border-slate-200 bg-white p-0.5 text-[9px]">
+              {([
+                { k: "precio", label: "Precio" },
+                ...(hasUnit ? [{ k: "unidad", label: "x unidad" }] : []),
+                { k: "relevancia", label: "Relevancia" },
+              ] as { k: SortKey; label: string }[]).map(({ k, label }) => (
+                <button
+                  key={k}
+                  onClick={() => setSortBy(k)}
+                  className={`rounded-full px-1.5 py-0.5 font-semibold transition-colors ${sortBy === k ? "bg-[#0a1628] text-white" : "text-slate-500 hover:bg-slate-100"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           <button onClick={() => scroll("left")} className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 hover:bg-slate-100">
             <ChevronLeft className="h-3.5 w-3.5 text-slate-500" />
           </button>

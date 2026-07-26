@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { width: 300px; margin: 0; font-family: -apple-system, system-ui, sans-serif; background: #f8fafc; color: #0f172a; }
+    header { display: flex; align-items: center; gap: 8px; padding: 12px 14px; background: #0a1628; color: #fff; }
+    header .logo { font-size: 18px; }
+    header h1 { font-size: 13px; margin: 0; font-weight: 600; }
+    .body { padding: 12px 14px; }
+    .muted { color: #64748b; font-size: 11px; line-height: 1.4; }
+    .store { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; margin-top: 8px; }
+    .store .name { font-size: 12px; font-weight: 600; }
+    .store .stat { font-size: 11px; color: #64748b; }
+    .bar { height: 5px; background: #e2e8f0; border-radius: 99px; overflow: hidden; margin-top: 4px; }
+    .bar > div { height: 100%; background: #22c55e; border-radius: 99px; transition: width .3s; }
+    .done { color: #16a34a; font-weight: 600; }
+    .empty { text-align: center; padding: 18px 4px; }
+    .empty .ico { font-size: 26px; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="logo">🛒</span>
+    <h1>Alfred Carritos</h1>
+  </header>
+  <div class="body">
+    <p class="muted">Alfred arma tus carritos en <b>tu propia sesión</b>. Nunca paga ni ve tus claves. Iniciá la compra desde la sección <b>Compras</b> de Alfred.</p>
+    <div id="stores"></div>
+    <div id="empty" class="empty" style="display:none">
+      <div class="ico">🧺</div>
+      <p class="muted">Sin carritos en curso.<br/>Andá a Alfred → Compras → "Armar carritos".</p>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

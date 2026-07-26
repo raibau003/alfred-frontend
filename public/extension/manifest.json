@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Alfred Carritos",
+  "version": "1.0.0",
+  "description": "Arma tus carritos de supermercado automáticamente en TU sesión (Jumbo, Líder, Unimarc, Tottus, Santa Isabel). Nunca paga ni ve tus claves.",
+  "permissions": ["scripting", "tabs", "storage"],
+  "host_permissions": [
+    "https://*.jumbo.cl/*",
+    "https://*.lider.cl/*",
+    "https://*.unimarc.cl/*",
+    "https://*.tottus.cl/*",
+    "https://*.santaisabel.cl/*",
+    "https://alfred-frontend-vercel.vercel.app/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "Alfred Carritos" },
+  "content_scripts": [
+    {
+      "matches": ["https://alfred-frontend-vercel.vercel.app/*"],
+      "js": ["relay.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
