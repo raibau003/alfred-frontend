@@ -296,3 +296,63 @@ export async function getTiendas(): Promise<{ id: string; nombre: string; url: s
     return [];
   }
 }
+
+// ── Configuración de compras ─────────────────────────────────────────────────
+// Lo que el optimizador necesita saber y no puede adivinar: dónde recibís, si tenés
+// algún programa de socio, cuántas tiendas tolerás y cuánto te cobran de despacho.
+
+export interface PrefsCompras {
+  comuna?: string;
+  programas?: string[];              // ["jumbo_prime", …]
+  retiro_en_tienda?: boolean;
+  max_tiendas?: number;              // 0 = sin límite
+  tiendas_evitadas?: string[];
+  tiendas_preferidas?: string[];
+  marcas_preferidas?: Record<string, string>;
+  despacho_propio?: Record<string, number>;   // el número que viste al pagar
+}
+
+export async function getPrefsCompras(): Promise<PrefsCompras> {
+  try {
+    const url = await getRouterUrl();
+    const resp = await fetch(`${url}/prefs`, { headers: await authHeaders() });
+    if (!resp.ok) return {};
+    return (await resp.json())?.prefs?.compras ?? {};
+  } catch {
+    return {};
+  }
+}
+
+export async function savePrefsCompras(compras: PrefsCompras, chatId?: string): Promise<boolean> {
+  try {
+    const url = await getRouterUrl();
+    const resp = await fetch(`${url}/prefs`, {
+      method: "PUT",
+      headers: await authHeaders(),
+      // El PUT hace merge: mandar solo `compras` no borra las preferencias de correo.
+      body: JSON.stringify({ compras, chat_id: chatId }),
+    });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
+
+export interface TablaDespacho {
+  comuna: string;
+  tabla: Record<string, { costo: number; minimo: number; gratis_desde: number; propio?: boolean; comuna?: string }>;
+  estimado: boolean;
+  programas_conocidos: Record<string, { tienda: string; nombre: string; gratis_desde: number }>;
+}
+
+export async function getDespacho(comuna?: string): Promise<TablaDespacho | null> {
+  try {
+    const url = await getRouterUrl();
+    const q = comuna ? `?comuna=${encodeURIComponent(comuna)}` : "";
+    const resp = await fetch(`${url}/shopping/delivery${q}`, { headers: await authHeaders() });
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch {
+    return null;
+  }
+}
