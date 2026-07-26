@@ -4,12 +4,23 @@ import { useAlfred } from "@/hooks/useAlfred";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ChatView } from "@/components/chat/ChatView";
 import { ThreadSidebar } from "@/components/chat/ThreadSidebar";
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 
 export default function ChatPage() {
+  return (
+    <Suspense fallback={null}>
+      <ChatPageInner />
+    </Suspense>
+  );
+}
+
+function ChatPageInner() {
   const { user } = useAuth();
-  const [activeThreadId, setActiveThreadId] = useState<string | undefined>();
+  const searchParams = useSearchParams();
+  const initialThread = searchParams.get("thread") ?? undefined;
+  const [activeThreadId, setActiveThreadId] = useState<string | undefined>(initialThread);
   const [showThreads, setShowThreads] = useState(false);
   const alfred = useAlfred(activeThreadId);
 
