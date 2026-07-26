@@ -27,6 +27,7 @@ interface Props {
   onToggleThreads?: () => void;
   showThreadsButton?: boolean;
   shoppingMode?: boolean;
+  onNewThread?: () => void;
 }
 
 // Extracts search terms from user message (split by commas, "y", newlines)
@@ -99,7 +100,7 @@ function groupProductsBySearchTerm(
   return result;
 }
 
-export function ChatView({ messages, busy, connected, onSend, onStop, userName, onToggleThreads, showThreadsButton, shoppingMode }: Props) {
+export function ChatView({ messages, busy, connected, onSend, onStop, userName, onToggleThreads, showThreadsButton, shoppingMode, onNewThread }: Props) {
   const [input, setInput] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [reactions, setReactions] = useState<Record<string, "up" | "down">>({});
@@ -235,8 +236,9 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
             )}
           </button>
           <button
-            onClick={() => onSend("")}
-            className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[10px] text-slate-500 hover:bg-slate-50"
+            onClick={() => onNewThread?.()}
+            disabled={!onNewThread}
+            className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[10px] text-slate-500 hover:bg-slate-50 disabled:opacity-40"
             title="Nueva conversacion"
           >
             <Plus className="h-3 w-3" />

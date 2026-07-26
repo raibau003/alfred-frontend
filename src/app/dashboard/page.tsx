@@ -17,7 +17,7 @@ interface Conv {
 interface Reminder {
   id: string; texto: string; remind_at: string | null; estado: string; categoria: string | null;
 }
-interface Mission { id: string; estado?: string; titulo?: string; objetivo?: string; nombre?: string; esperando_respuesta?: boolean }
+interface Mission { id: string; estado?: string; titulo?: string; objetivo?: string; nombre?: string; last_reply_at?: string | null; intentos_seguimiento?: number }
 interface FinanceSummary {
   resumen?: { gastoMes: number; presupuesto: number; pctUsado: number; disponible: number };
   mesReferenciaLabel?: string;
@@ -74,8 +74,11 @@ export default function DashboardPage() {
   const remPend = reminders.filter(r => r.estado === "pendiente" || r.estado === "enviado");
   const proximoRem = remPend[0];
   const misActivas = missions.filter(m => (m.estado || "").toLowerCase() === "activa" || (m.estado || "").toLowerCase() === "en_curso");
-  const misEsperan = missions.filter(m => m.esperando_respuesta || (m.estado || "").toLowerCase() === "esperando");
-  const waHoy = convs.filter(c => c.channel === "whatsapp" && c.created_at?.slice(0, 10) === new Date().toISOString().slice(0, 10)).length;
+  // "Esperando respuesta" = misión activa donde Alfred ya escribió (hizo seguimiento) y aún no hay respuesta.
+  const misEsperan = missions.filter(m => (m.estado || "").toLowerCase() === "activa" && !m.last_reply_at && (m.intentos_seguimiento || 0) > 0);
+  const clDate = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Santiago" });
+  const hoyCl = new Date().toLocaleDateString("en-CA", { timeZone: "America/Santiago" });
+  const waHoy = convs.filter(c => c.channel === "whatsapp" && c.created_at && clDate(c.created_at) === hoyCl).length;
   const fin = finance?.resumen;
   const anomalias = finance?.anomalias || [];
 
@@ -166,7 +169,9 @@ export default function DashboardPage() {
           <div className="space-y-1 max-h-96 overflow-y-auto">
             {recientes.map(c => {
               const time = new Date(c.created_at).toLocaleString("es-CL", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "America/Santiago" });
-              const openable = !!c.thread_id;
+              // Solo los chats web comparten el sistema de hilos del front (conversation_threads);
+              // los de WhatsApp viven en otra tabla y abrirían un chat vacío.
+              const openable = !!c.thread_id && c.channel === "web";
               return (
                 <button
                   key={c.id}
@@ -250,11 +255,13 @@ function fmtWhen(iso: string | null): string {
   try {
     const d = new Date(iso);
     const now = new Date();
-    const dias = Math.floor((d.getTime() - now.getTime()) / 86400000);
     const hora = d.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", timeZone: "America/Santiago" });
-    if (dias < 0) return "Vencido";
-    if (dias === 0) return `Hoy ${hora}`;
-    if (dias === 1) return `Mañana ${hora}`;
+    if (d.getTime() < now.getTime()) return "Vencido";
+    // Comparación por fecha-CALENDARIO en zona Chile (no por horas transcurridas).
+    const cl = (x: Date) => x.toLocaleDateString("en-CA", { timeZone: "America/Santiago" });
+    const dStr = cl(d);
+    if (dStr === cl(now)) return `Hoy ${hora}`;
+    if (dStr === cl(new Date(now.getTime() + 86400000))) return `Mañana ${hora}`;
     return d.toLocaleDateString("es-CL", { day: "2-digit", month: "short", timeZone: "America/Santiago" }) + " " + hora;
   } catch { return "—"; }
 }

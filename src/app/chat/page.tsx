@@ -65,6 +65,7 @@ function ChatPageInner() {
         userName={user?.email?.split("@")[0] ?? "Usuario"}
         onToggleThreads={() => setShowThreads(!showThreads)}
         showThreadsButton={!showThreads}
+        onNewThread={() => { setActiveThreadId(undefined); alfred.newThread(); }}
       />
     </div>
   );

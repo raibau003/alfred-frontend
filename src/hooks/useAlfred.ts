@@ -25,6 +25,15 @@ export function useAlfred(threadId?: string) {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const seenTextsRef = useRef<Set<string>>(new Set());
 
+  // Sincronizar ref + estado cuando cambia el threadId (ej: seleccionar otro hilo en el sidebar).
+  // Sin esto, los mensajes nuevos se guardaban en el thread_id viejo (ref inicializado una sola vez).
+  useEffect(() => {
+    threadIdRef.current = threadId ?? null;
+    setCurrentThreadId(threadId ?? null);
+    setMessages([]);
+    seenTextsRef.current = new Set();
+  }, [threadId]);
+
   // Load existing messages from Supabase if threadId provided
   useEffect(() => {
     if (!threadId) return;

@@ -58,10 +58,17 @@ export default function ShoppingPage() {
       .eq("status", "pending");
     const rows = data || [];
     if (rows.length === 0) { setNote("Tu carro está vacío. Agregá productos desde el chat primero."); return; }
+    // Normaliza el store a la clave canónica que espera la extensión (sin acentos/underscore).
+    const normStore = (raw: string) => {
+      const s = (raw || "super").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/_/g, " ").trim();
+      if (s.includes("santa") && s.includes("isabel")) return "santa isabel";
+      for (const k of ["jumbo", "lider", "unimarc", "tottus"]) if (s.includes(k)) return k;
+      return s;
+    };
     // Agrupar por tienda → spec para la extensión
     const byStore: Record<string, { name: string; qty: number }[]> = {};
     for (const r of rows) {
-      const s = (r.store || "super").toLowerCase();
+      const s = normStore(r.store);
       (byStore[s] = byStore[s] || []).push({ name: r.product_name, qty: r.quantity || 1 });
     }
     const spec = { carts: Object.entries(byStore).map(([store, items]) => ({ store, items })) };
@@ -140,6 +147,7 @@ export default function ShoppingPage() {
           onSend={alfred.send}
           userName={user?.email?.split("@")[0] ?? "Usuario"}
           shoppingMode
+          onNewThread={() => alfred.newThread()}
         />
       </div>
 
