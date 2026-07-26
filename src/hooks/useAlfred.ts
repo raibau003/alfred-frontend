@@ -51,6 +51,7 @@ export function useAlfred(threadId?: string) {
             content: m.content,
             agent: m.agent ?? undefined,
             timestamp: new Date(m.created_at),
+            rich: m.metadata?.rich ?? undefined,
           })));
         }
       });
@@ -75,7 +76,7 @@ export function useAlfred(threadId?: string) {
 
   // Save message to Supabase
   const saveMessage = useCallback(
-    async (role: "user" | "assistant", content: string, agent?: string) => {
+    async (role: "user" | "assistant", content: string, agent?: string, rich?: ChatMessage["rich"]) => {
       if (!user) return;
       const supabase = createClient();
       let tid = threadIdRef.current;
@@ -97,6 +98,8 @@ export function useAlfred(threadId?: string) {
         role,
         content,
         agent: agent ?? null,
+        // rich (carruseles, carrito, checkout) se guarda en metadata para rehidratar al recargar.
+        metadata: rich ? { rich } : null,
       });
     },
     [user]
@@ -164,7 +167,7 @@ export function useAlfred(threadId?: string) {
             setBusy(false);
             setMessages(prev => prev.filter(m => !m.id.startsWith("hb-")));
             const lastReal = msgs.filter(m => m.role === "assistant" && m.text.length > 30 && !isProgress(m.text)).pop();
-            if (lastReal) saveMessage("assistant", lastReal.text, lastReal.agent);
+            if (lastReal) saveMessage("assistant", lastReal.text, lastReal.agent, lastReal.rich);
             return;
           }
 
@@ -183,7 +186,7 @@ export function useAlfred(threadId?: string) {
             setBusy(false);
             setMessages(prev => prev.filter(m => !m.id.startsWith("hb-")));
             const lastReal = msgs.filter(m => m.role === "assistant" && m.text.length > 30 && !isProgress(m.text)).pop();
-            if (lastReal) saveMessage("assistant", lastReal.text, lastReal.agent);
+            if (lastReal) saveMessage("assistant", lastReal.text, lastReal.agent, lastReal.rich);
             return;
           }
 
