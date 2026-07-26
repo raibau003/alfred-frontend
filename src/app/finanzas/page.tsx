@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   Wallet, TrendingUp, AlertTriangle, RefreshCw, Loader2, Download, Repeat, CreditCard,
-  ArrowUpRight, Pencil, Check, X, Layers, Landmark, Link2,
+  ArrowUpRight, Pencil, Check, X, Layers,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine, Cell,
@@ -72,25 +72,6 @@ export default function FinanzasPage() {
     setTimeout(() => { setImporting(false); load(); }, 4000);
   };
 
-  const [bankMsg, setBankMsg] = useState<string | null>(null);
-  const [banking, setBanking] = useState(false);
-  const bank = async (action: "connect" | "sync") => {
-    setBanking(true);
-    setBankMsg(action === "connect" ? "Abriendo Chrome en tu Mac…" : "Sincronizando con tu sesión…");
-    try {
-      const r = await fetch("/api/bank", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
-      const j = await r.json();
-      if (action === "connect") {
-        setBankMsg(j.ok ? "✅ Chrome abierto en tu Mac. Logueate (RUT + clave + MFA) y después tocá “Sincronizar”." : `No pude abrir el navegador (${j.error || "bridge caído"}).`);
-      } else {
-        setBankMsg(j.ok ? "✅ Sincronizado. Actualizando dashboard…" : `Error al sincronizar: ${j.error || "revisá la sesión"}.`);
-        if (j.ok) setTimeout(load, 2500);
-      }
-    } catch (e) {
-      setBankMsg("Error de conexión con Alfred.");
-    }
-    setBanking(false);
-  };
 
   const saveBudget = async () => {
     const v = Number(budgetInput.replace(/\D/g, ""));
@@ -131,28 +112,6 @@ export default function FinanzasPage() {
           {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
           Importar cartola
         </button>
-      </div>
-
-      {/* Conexión al banco (Alfred abre Chrome en tu Mac; vos te logueás) */}
-      <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-            <Landmark className="h-5 w-5" />
-          </div>
-          <div className="flex-1 min-w-[180px]">
-            <p className="text-sm font-medium text-slate-800">Conexión directa al Santander</p>
-            <p className="text-xs text-slate-500">Alfred abre Chrome en tu Mac; vos te logueás (tu clave nunca sale de tu Mac) y él saca tus movimientos.</p>
-          </div>
-          <button onClick={() => bank("connect")} disabled={banking}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-            <Link2 className="h-3.5 w-3.5" /> Conectar banco
-          </button>
-          <button onClick={() => bank("sync")} disabled={banking}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900 disabled:opacity-50">
-            {banking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Sincronizar
-          </button>
-        </div>
-        {bankMsg && <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">{bankMsg}</p>}
       </div>
 
       {sinDatos && (
