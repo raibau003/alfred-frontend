@@ -418,6 +418,7 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
                                   products={group.products}
                                   onAction={onSend}
                                   compact
+                                  searchTerm={group.term}
                                   onAddToCart={(p, qty) => addToCartDirect(p, qty)}
                                 />
                               </div>
@@ -443,6 +444,7 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
                         <ProductCarousel
                           products={msg.rich.products}
                           onAction={onSend}
+                          searchTerm={searchTerms[0] || ""}
                           onAddToCart={(p, qty) => addToCartDirect(p, qty)}
                         />
                       );

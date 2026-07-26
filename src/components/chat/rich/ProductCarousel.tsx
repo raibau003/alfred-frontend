@@ -13,6 +13,9 @@ interface Product {
   image_url?: string;
   product_url?: string;
   available?: boolean;
+  unit_price?: number;   // precio por unidad de medida (ej: 2800 = $2.800 por Kg/L)
+  unit?: string;         // unidad de medida: "Kg" | "L" | "un" | "100 g" ...
+  size?: string;         // formato/tamaño del envase (ej: "1 L", "500 g")
 }
 
 interface Props {
@@ -21,6 +24,8 @@ interface Props {
   groupLabel?: string;
   onAddToCart?: (product: Product, quantity: number) => void;
   compact?: boolean;
+  /** Término de búsqueda de este grupo, para "+ Más alternativas". Si no viene, usa groupLabel. */
+  searchTerm?: string;
 }
 
 const storeLogos: Record<string, string> = {
@@ -43,7 +48,7 @@ const storeColors: Record<string, string> = {
   mercadolibre: "border-purple-300 bg-purple-50",
 };
 
-export function ProductCarousel({ products, onAction, groupLabel, onAddToCart, compact }: Props) {
+export function ProductCarousel({ products, onAction, groupLabel, onAddToCart, compact, searchTerm }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [addedIdx, setAddedIdx] = useState<number | null>(null);
@@ -53,6 +58,8 @@ export function ProductCarousel({ products, onAction, groupLabel, onAddToCart, c
   // Sort by price ascending
   const sorted = [...products].sort((a, b) => a.price - b.price);
   const cheapest = sorted[0];
+  // Qué producto buscar más alternativas: el término del grupo, o el nombre del más barato.
+  const moreQuery = (searchTerm || groupLabel || sorted[0]?.name || "").replace(/^\d+\s+productos.*/i, "").trim() || sorted[0]?.name || "";
 
   const scroll = (dir: "left" | "right") => {
     if (!scrollRef.current) return;
@@ -142,6 +149,15 @@ export function ProductCarousel({ products, onAction, groupLabel, onAddToCart, c
                 <span className="text-[9px] font-bold text-red-600">-{p.discount_pct}% OFF</span>
               )}
 
+              {/* Precio por unidad de medida (para comparar tamaños distintos) + formato */}
+              {(p.unit_price || p.size) && (
+                <p className="mt-0.5 text-[9px] text-slate-500">
+                  {p.unit_price ? <span className="font-semibold">${p.unit_price.toLocaleString("es-CL")}{p.unit ? ` / ${p.unit}` : ""}</span> : null}
+                  {p.unit_price && p.size ? " · " : null}
+                  {p.size ? <span className="text-slate-400">{p.size}</span> : null}
+                </p>
+              )}
+
               {/* Quantity selector */}
               <div className="flex items-center justify-center gap-1.5 mt-2">
                 <button
@@ -184,6 +200,20 @@ export function ProductCarousel({ products, onAction, groupLabel, onAddToCart, c
             </div>
           );
         })}
+
+        {/* Card "+ Más alternativas": pide al agente más opciones del mismo producto */}
+        {moreQuery && (
+          <button
+            onClick={() => onAction(`busca más alternativas de "${moreQuery}" en los supermercados`)}
+            className="flex-shrink-0 w-44 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-3 flex flex-col items-center justify-center gap-2 text-slate-500 hover:border-[#0a1628]/40 hover:bg-slate-100 transition-colors"
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white border border-slate-200">
+              <Plus className="h-5 w-5" />
+            </span>
+            <span className="text-[11px] font-semibold text-center leading-tight">Más alternativas</span>
+            <span className="text-[9px] text-slate-400 text-center leading-tight">Otras marcas y tamaños de {moreQuery.length > 16 ? moreQuery.slice(0, 16) + "…" : moreQuery}</span>
+          </button>
+        )}
       </div>
 
       {/* Action buttons — only show when not in grouped/compact mode */}
