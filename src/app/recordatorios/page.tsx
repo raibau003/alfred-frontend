@@ -168,12 +168,22 @@ export default function RecordatoriosPage() {
         </button>
       </div>
 
-      <div className="mb-4 flex items-center gap-3 text-sm">
-        <label className="inline-flex items-center gap-1.5 text-slate-600">
-          <input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} /> Mostrar completados
-        </label>
+      <div className="mb-2 flex items-center gap-2 text-sm">
+        <div className="inline-flex overflow-hidden rounded-lg border border-slate-200">
+          <button onClick={() => setShowDone(false)}
+            className={`px-3 py-1.5 text-sm font-medium ${!showDone ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>
+            Pendientes
+          </button>
+          <button onClick={() => setShowDone(true)}
+            className={`px-3 py-1.5 text-sm font-medium ${showDone ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>
+            Completados
+          </button>
+        </div>
         <button onClick={load} className="ml-auto text-slate-400 hover:text-slate-700" title="Recargar"><RotateCcw className="h-4 w-4" /></button>
       </div>
+      <p className="mb-4 text-xs text-slate-400">
+        Tocá el círculo para marcar como <b>hecho</b>; tocá el círculo verde de un completado para <b>volverlo a pendiente</b>.
+      </p>
 
       {loading ? (
         <div className="flex justify-center py-16 text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
