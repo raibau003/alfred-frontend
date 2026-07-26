@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Target, Loader2, RefreshCw, StopCircle, MessageSquare, Mail, Bell, PenLine, Sparkles, ChevronDown, ChevronRight, Plus, Pencil, Trash2, RotateCcw, Wand2, Play, X } from "lucide-react";
+import { Target, Loader2, RefreshCw, StopCircle, MessageSquare, Mail, Bell, PenLine, Sparkles, ChevronDown, ChevronRight, Plus, Pencil, Trash2, RotateCcw, Wand2, Play, X, CheckCircle2 } from "lucide-react";
 
 type Mission = {
   id: string;
@@ -76,6 +76,17 @@ export default function MisionesPage() {
   const del = (id: string) => post({ action: "estado", id, estado: "eliminada" });
   const revive = (id: string) => post({ action: "estado", id, estado: "pausada" });
   const start = (id: string) => post({ action: "estado", id, estado: "activa" });
+  const finish = (id: string) => post({ action: "estado", id, estado: "lograda" });
+
+  // Una misión está "pendiente editar" si no tiene un número de contacto usable:
+  // Alfred necesita un número para escribir. Sin eso no puede arrancar.
+  const incompleta = (m: Mission) => (m.chat_id || "").replace(/\D/g, "").length < 6;
+
+  // Convierte una propuesta de "Alfred te propone" en una misión (queda en borrador,
+  // y si le falta el contacto aparece como "Pendiente editar").
+  const addFromProposal = async (p: Proposal) => {
+    await post({ action: "create", objetivo: p.sugerencia || p.titulo, chat_id: "", nombre: p.titulo, followup_horas: 2 });
+  };
 
   // Formulario crear/editar
   const [showForm, setShowForm] = useState(false);
@@ -89,9 +100,18 @@ export default function MisionesPage() {
 
   const openNew = () => { setEditId(null); setFObjetivo(""); setFContacto(""); setFHoras("2"); setShowForm(true); };
   const openEdit = (m: Mission) => { setEditId(m.id); setFObjetivo(m.objetivo); setFContacto(m.chat_nombre || m.chat_id || ""); setFHoras(String(m.followup_horas || 2)); setShowForm(true); };
+  // Normaliza un contacto a chat_id de WhatsApp (dígitos → 569...@c.us). Si ya viene con @, lo deja.
+  const toChatId = (v: string) => {
+    const t = (v || "").trim();
+    if (!t) return "";
+    if (t.includes("@")) return t;
+    const num = t.replace(/\D/g, "");
+    return num.length >= 8 ? `${num}@c.us` : "";
+  };
   const saveForm = async () => {
     if (!fObjetivo.trim()) return;
-    if (editId) await post({ action: "edit", id: editId, objetivo: fObjetivo, chat_nombre: fContacto, followup_horas: Number(fHoras) || 2 });
+    const cid = toChatId(fContacto);
+    if (editId) await post({ action: "edit", id: editId, objetivo: fObjetivo, chat_nombre: fContacto, ...(cid ? { chat_id: cid } : {}), followup_horas: Number(fHoras) || 2 });
     else await post({ action: "create", objetivo: fObjetivo, chat_id: fContacto, nombre: fContacto, followup_horas: Number(fHoras) || 2 });
     setShowForm(false);
   };
@@ -211,11 +231,15 @@ export default function MisionesPage() {
                     </div>
                     <p className="mt-0.5 text-sm text-slate-500">{p.sugerencia}</p>
                   </div>
+                  <button onClick={() => addFromProposal(p)} title="Agregar a misiones"
+                    className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-lg border border-indigo-200 px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50">
+                    <Plus className="h-3.5 w-3.5" /> Misión
+                  </button>
                 </div>
               );
             })}
             <p className="pt-1 text-center text-xs text-slate-400">
-              Aprobalas por WhatsApp: decile a Alfred <b>“hacé la 1 y la 3”</b> o <b>“hacé todas”</b>.
+              Tocá <b>+ Misión</b> para gestionarla desde acá, o aprobalas por WhatsApp: <b>“hacé la 1 y la 3”</b> / <b>“hacé todas”</b>.
             </p>
           </div>
         )}
@@ -242,8 +266,14 @@ export default function MisionesPage() {
                   </button>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium text-slate-800">{m.chat_nombre || m.chat_id}</span>
+                      <span className="text-sm font-medium text-slate-800">{m.chat_nombre || m.chat_id || "Sin contacto"}</span>
                       <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${e.cls}`}>{e.label}</span>
+                      {incompleta(m) && (
+                        <button onClick={() => openEdit(m)} title="Falta el contacto — tocá para completar"
+                          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold bg-amber-100 text-amber-700 hover:bg-amber-200">
+                          <PenLine className="h-3 w-3" /> Pendiente editar
+                        </button>
+                      )}
                     </div>
                     <p className="mt-0.5 text-sm text-slate-600">{m.objetivo}</p>
                     <p className="mt-1 text-xs text-slate-400">
@@ -252,11 +282,16 @@ export default function MisionesPage() {
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     {(m.estado === "pausada" || m.estado === "borrador") && (
-                      <button onClick={() => start(m.id)} title="Iniciar (Alfred escribe)" className="rounded-lg border border-emerald-200 p-1.5 text-emerald-600 hover:bg-emerald-50"><Play className="h-3.5 w-3.5" /></button>
+                      incompleta(m) ? (
+                        <button onClick={() => openEdit(m)} title="Completá el contacto para poder iniciar" className="rounded-lg border border-slate-200 p-1.5 text-slate-300 cursor-not-allowed" disabled><Play className="h-3.5 w-3.5" /></button>
+                      ) : (
+                        <button onClick={() => start(m.id)} title="Iniciar (Alfred escribe)" className="rounded-lg border border-emerald-200 p-1.5 text-emerald-600 hover:bg-emerald-50"><Play className="h-3.5 w-3.5" /></button>
+                      )
                     )}
                     {m.estado === "activa" && (
                       <button onClick={() => stop(m.id)} title="Frenar" className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-600"><StopCircle className="h-3.5 w-3.5" /></button>
                     )}
+                    <button onClick={() => finish(m.id)} title="Dar por lista" className="rounded-lg border border-blue-200 p-1.5 text-blue-600 hover:bg-blue-50"><CheckCircle2 className="h-3.5 w-3.5" /></button>
                     <button onClick={() => openEdit(m)} title="Editar" className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50"><Pencil className="h-3.5 w-3.5" /></button>
                     <button onClick={() => del(m.id)} title="Eliminar" className="rounded-lg border border-slate-200 p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
                   </div>
