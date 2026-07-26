@@ -58,6 +58,12 @@ function groupProductsBySearchTerm(
   }
 
   for (const product of products) {
+    // Si el backend ya etiquetó el término buscado, lo usamos directo (más preciso que adivinar).
+    if (product.term) {
+      const t = searchTerms.find((st) => st.toLowerCase() === String(product.term).toLowerCase()) || String(product.term);
+      (groups[t] = groups[t] || []).push(product);
+      continue;
+    }
     const pName = (product.name || "").toLowerCase();
     let bestTerm = "";
     let bestScore = 0;
@@ -81,8 +87,10 @@ function groupProductsBySearchTerm(
     }
   }
 
-  const result = searchTerms
-    .filter((t) => groups[t].length > 0)
+  // Orden: primero los términos buscados, luego cualquier término extra que haya etiquetado el backend.
+  const orderedTerms = [...searchTerms, ...Object.keys(groups).filter((k) => !searchTerms.includes(k))];
+  const result = orderedTerms
+    .filter((t) => (groups[t] || []).length > 0)
     .map((t) => ({ term: t, products: groups[t] }));
 
   if (unmatched.length > 0) {
@@ -418,7 +426,7 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
                                   products={group.products}
                                   onAction={onSend}
                                   compact
-                                  searchTerm={group.term}
+                                  searchTerm={group.term === "Otros" ? undefined : group.term}
                                   onAddToCart={(p, qty) => addToCartDirect(p, qty)}
                                 />
                               </div>

@@ -12,6 +12,12 @@ const STORES = {
 
 const state = { running: false, progress: {}, lastSpec: null };
 
+// El service worker MV3 se recicla. Al arrancar restauramos el último estado para que el popup
+// no muestre "vacío" en falso; si estaba "running", el loop murió con el SW → lo marcamos parado.
+chrome.storage.local.get("alfredState", (d) => {
+  if (d && d.alfredState) { Object.assign(state, d.alfredState); state.running = false; }
+});
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "BUILD_CARTS") {
     buildCarts(msg.spec, sender.tab?.id).catch((e) => console.warn("[alfred] build error", e));
@@ -48,17 +54,26 @@ function report(alfredTabId) {
   chrome.storage.local.set({ alfredState: state });
 }
 
-// Heurística inyectada en la página de la tienda: hace click en el primer "Agregar" del
-// primer producto del resultado de búsqueda. Los selectores varían por tienda → best-effort v1.
-function addFirstToCart(qty) {
-  const rx = /(agregar|añadir|add to cart|agregar al carro|sumar al carro)/i;
-  const candidates = [...document.querySelectorAll('button, a[role="button"], [role="button"], [data-testid*="add"], [class*="add-to-cart"], [class*="addToCart"]')];
-  const btn = candidates.find((b) => {
+// Inyectada en la página de la tienda. Espera a que el SPA renderice resultados, acota al
+// PRIMER producto, y clickea su "Agregar" (evitando favoritos/tarjeta/cupón). Devuelve el
+// resultado real para no reportar "listo" en falso. Los selectores varían por tienda → v1.
+async function addFirstToCart(qty) {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const rx = /(agregar|añadir|add to cart|sumar)/i;
+  const badRx = /(favorito|wishlist|deseos|tarjeta|cup[oó]n|direcci|lista)/i;
+  const cardSel = '[data-testid*="product"], article, li[class*="roduct"], div[class*="roduct-card"], div[class*="roductCard"], [class*="shelf"] li, [class*="ProductCard"]';
+  // Esperar hasta ~8s a que aparezca al menos una tarjeta de producto (SPA client-render)
+  let card = null;
+  for (let t = 0; t < 20; t++) { card = document.querySelector(cardSel); if (card) break; await sleep(400); }
+  const scope = card || document;
+  const btns = [...scope.querySelectorAll('button, a[role="button"], [role="button"], [data-testid*="add"], [class*="add-to-cart"], [class*="addToCart"]')];
+  const btn = btns.find((b) => {
     const t = (b.getAttribute("aria-label") || "") + " " + (b.textContent || "") + " " + (b.title || "");
-    return rx.test(t) && b.offsetParent !== null;
+    return rx.test(t) && !badRx.test(t) && b.offsetParent !== null && !b.disabled;
   });
-  if (btn) { for (let k = 0; k < (qty || 1); k++) btn.click(); return true; }
-  return false;
+  if (!btn) return { added: false, reason: card ? "sin_boton_agregar" : "sin_resultados" };
+  for (let k = 0; k < (qty || 1); k++) { btn.click(); await sleep(350); }
+  return { added: true };
 }
 
 async function buildCarts(spec, alfredTabId) {
@@ -85,17 +100,21 @@ async function buildCarts(spec, alfredTabId) {
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
+      let res = { added: false, reason: "error" };
       try {
         await chrome.tabs.update(tab.id, { url: store.search(item.name) });
         await waitTabLoad(tab.id);
-        await sleep(1600);
-        await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: addFirstToCart, args: [item.qty || 1] });
-      } catch {}
-      state.progress[cart.store].done = i + 1;
-      state.progress[cart.store].status = "adding";
+        const out = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: addFirstToCart, args: [item.qty || 1] });
+        res = (out && out[0] && out[0].result) || res;
+      } catch { res = { added: false, reason: "inyeccion_fallo" }; }
+      const pr = state.progress[cart.store];
+      pr.done = i + 1;
+      if (res.added) pr.added = (pr.added || 0) + 1; else pr.failed = (pr.failed || 0) + 1;
+      pr.status = "adding";
       report(alfredTabId);
     }
-    state.progress[cart.store].status = "done";
+    const pr = state.progress[cart.store];
+    pr.status = (pr.failed || 0) > 0 ? "done_partial" : "done";
     report(alfredTabId);
   }
 

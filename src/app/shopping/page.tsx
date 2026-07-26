@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAlfred } from "@/hooks/useAlfred";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ChatView } from "@/components/chat/ChatView";
 import { createClient } from "@/lib/supabase/client";
 import { Puzzle, Download, Loader2, CheckCircle2, X, ShoppingBag } from "lucide-react";
 
-type StoreProgress = Record<string, { name?: string; done: number; total: number; status: string }>;
+type StoreProgress = Record<string, { name?: string; done: number; total: number; status: string; added?: number; failed?: number }>;
 
 export default function ShoppingPage() {
   const { user } = useAuth();
@@ -18,6 +18,16 @@ export default function ShoppingPage() {
   const [showInstall, setShowInstall] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
+  const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearWatchdog = () => { if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; } };
+  const armWatchdog = useCallback((ms: number) => {
+    clearWatchdog();
+    watchdogRef.current = setTimeout(() => {
+      setBuilding(false);
+      setNote("La extensión no respondió. ¿Está instalada y activa? Descargala e instalala desde el botón «Extensión».");
+    }, ms);
+  }, []);
+
   // Escucha a la extensión (presencia + progreso) vía window.postMessage
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
@@ -27,11 +37,15 @@ export default function ShoppingPage() {
       if (d.__alfred === "progress") {
         setProgress(d.progress || {});
         setBuilding(!!d.running);
+        // Mientras siga armando, re-armamos el watchdog; al terminar, lo apagamos.
+        if (d.running) armWatchdog(25000); else clearWatchdog();
       }
     };
     window.addEventListener("message", onMsg);
-    return () => window.removeEventListener("message", onMsg);
-  }, []);
+    // Ping activo: si la extensión ya anunció presencia antes de montar el listener, que responda.
+    window.postMessage({ __alfred: "ping" }, "*");
+    return () => { window.removeEventListener("message", onMsg); clearWatchdog(); };
+  }, [armWatchdog]);
 
   const armarCarritos = useCallback(async () => {
     if (!user) return;
@@ -54,7 +68,8 @@ export default function ShoppingPage() {
     setBuilding(true);
     setNote(null);
     window.postMessage({ __alfred: "build_carts", spec }, "*");
-  }, [user, extPresent]);
+    armWatchdog(15000); // si no llega progreso en 15s, desbloqueamos el botón
+  }, [user, extPresent, armWatchdog]);
 
   const stores = Object.entries(progress);
 
@@ -93,14 +108,15 @@ export default function ShoppingPage() {
           {stores.map(([store, p]) => {
             const pct = p.total ? Math.round((p.done / p.total) * 100) : 0;
             const done = p.status === "done";
+            const partial = p.status === "done_partial";
             return (
               <div key={store} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5">
                 <span className="text-xs font-medium text-slate-700 capitalize">{p.name || store}</span>
                 <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
-                  <div className={`h-full rounded-full ${done ? "bg-emerald-500" : "bg-[#0a1628]"}`} style={{ width: `${pct}%` }} />
+                  <div className={`h-full rounded-full ${done ? "bg-emerald-500" : partial ? "bg-amber-500" : "bg-[#0a1628]"}`} style={{ width: `${pct}%` }} />
                 </div>
-                <span className={`text-[10px] ${done ? "text-emerald-600 font-semibold" : "text-slate-400"}`}>
-                  {done ? "¡Listo!" : p.status === "opening" ? "Conectando…" : `${p.done}/${p.total}`}
+                <span className={`text-[10px] ${done ? "text-emerald-600 font-semibold" : partial ? "text-amber-600 font-semibold" : "text-slate-400"}`}>
+                  {done ? "¡Listo!" : partial ? `${p.added ?? 0}/${p.total} agregados` : p.status === "opening" ? "Conectando…" : `${p.done}/${p.total}`}
                 </span>
               </div>
             );

@@ -52,21 +52,24 @@ type SortKey = "precio" | "unidad" | "relevancia";
 
 export function ProductCarousel({ products, onAction, groupLabel, onAddToCart, compact, searchTerm }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [quantities, setQuantities] = useState<Record<number, number>>({});
-  const [addedIdx, setAddedIdx] = useState<number | null>(null);
+  // Estado por PRODUCTO (id estable), no por índice: al reordenar no se mezcla cantidad/"agregado".
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [addedId, setAddedId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>("precio");
 
   if (!products || products.length === 0) return null;
 
+  const pid = (p: Product) => `${p.store}::${p.name}`;
   // El "más barato" siempre se calcula por precio absoluto, sin importar el orden elegido.
   const cheapest = [...products].reduce((min, p) => (p.price < min.price ? p : min), products[0]);
   const hasUnit = products.some((p) => p.unit_price && p.unit_price > 0);
-  // Orden visible según el control: precio, precio por unidad, o relevancia (orden original).
+  // Orden visible según el control. En "x unidad" los productos SIN unit_price van al final
+  // (no se pueden comparar por unidad), evitando mezclar escalas ($/kg vs total).
   const sorted =
     sortBy === "relevancia"
       ? [...products]
       : sortBy === "unidad"
-        ? [...products].sort((a, b) => (a.unit_price || a.price) - (b.unit_price || b.price))
+        ? [...products].sort((a, b) => (a.unit_price || Infinity) - (b.unit_price || Infinity))
         : [...products].sort((a, b) => a.price - b.price);
   // Qué producto buscar más alternativas: el término del grupo, o el nombre del más barato.
   const moreQuery = (searchTerm || groupLabel || sorted[0]?.name || "").replace(/^\d+\s+productos.*/i, "").trim() || sorted[0]?.name || "";
@@ -76,18 +79,19 @@ export function ProductCarousel({ products, onAction, groupLabel, onAddToCart, c
     scrollRef.current.scrollBy({ left: dir === "left" ? -220 : 220, behavior: "smooth" });
   };
 
-  const getQty = (idx: number) => quantities[idx] ?? 1;
-  const setQty = (idx: number, q: number) => setQuantities(prev => ({ ...prev, [idx]: Math.max(1, Math.min(10, q)) }));
+  const getQty = (id: string) => quantities[id] ?? 1;
+  const setQty = (id: string, q: number) => setQuantities(prev => ({ ...prev, [id]: Math.max(1, Math.min(10, q)) }));
 
-  const handleAdd = (p: Product, idx: number) => {
-    const qty = getQty(idx);
+  const handleAdd = (p: Product) => {
+    const id = pid(p);
+    const qty = getQty(id);
     if (onAddToCart) {
       onAddToCart(p, qty);
     } else {
       onAction(`agrega "${p.name}" de ${p.store} a $${p.price} al carro`);
     }
-    setAddedIdx(idx);
-    setTimeout(() => setAddedIdx(null), 2000);
+    setAddedId(id);
+    setTimeout(() => setAddedId((cur) => (cur === id ? null : cur)), 2000);
   };
 
   return (
@@ -127,15 +131,16 @@ export function ProductCarousel({ products, onAction, groupLabel, onAddToCart, c
       {/* Carousel */}
       <div ref={scrollRef} className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide" style={{ scrollbarWidth: "none" }}>
         {sorted.map((p, i) => {
-          const isCheapest = p.price === cheapest.price;
+          const id = pid(p);
+          const isCheapest = p === cheapest;
           const storeKey = p.store.toLowerCase();
           const color = storeColors[storeKey] || "border-slate-200 bg-white";
           const logo = storeLogos[storeKey] || "🏪";
-          const isAdded = addedIdx === i;
+          const isAdded = addedId === id;
 
           return (
             <div
-              key={i}
+              key={`${id}-${i}`}
               className={`flex-shrink-0 w-44 rounded-xl border-2 p-3 transition-shadow hover:shadow-lg ${isCheapest ? "border-green-400 bg-green-50 ring-2 ring-green-200" : color}`}
             >
               {/* Cheapest badge */}
@@ -189,17 +194,17 @@ export function ProductCarousel({ products, onAction, groupLabel, onAddToCart, c
               {/* Quantity selector */}
               <div className="flex items-center justify-center gap-1.5 mt-2">
                 <button
-                  onClick={() => setQty(i, getQty(i) - 1)}
+                  onClick={() => setQty(id, getQty(id) - 1)}
                   className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-slate-500 hover:bg-slate-100 disabled:opacity-30"
-                  disabled={getQty(i) <= 1}
+                  disabled={getQty(id) <= 1}
                 >
                   <Minus className="h-2.5 w-2.5" />
                 </button>
-                <span className="text-xs font-bold text-slate-700 w-4 text-center">{getQty(i)}</span>
+                <span className="text-xs font-bold text-slate-700 w-4 text-center">{getQty(id)}</span>
                 <button
-                  onClick={() => setQty(i, getQty(i) + 1)}
+                  onClick={() => setQty(id, getQty(id) + 1)}
                   className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-slate-500 hover:bg-slate-100 disabled:opacity-30"
-                  disabled={getQty(i) >= 10}
+                  disabled={getQty(id) >= 10}
                 >
                   <Plus className="h-2.5 w-2.5" />
                 </button>
@@ -214,7 +219,7 @@ export function ProductCarousel({ products, onAction, groupLabel, onAddToCart, c
                   <ArrowDownUp className="h-2.5 w-2.5" /> Comparar
                 </button>
                 <button
-                  onClick={() => handleAdd(p, i)}
+                  onClick={() => handleAdd(p)}
                   disabled={isAdded}
                   className={`flex-1 flex items-center justify-center gap-0.5 rounded-md py-1.5 text-[8px] text-white transition-colors ${isAdded ? "bg-green-500" : "bg-[#0a1628] hover:bg-[#1e3a5f]"}`}
                 >

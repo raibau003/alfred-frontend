@@ -9,6 +9,7 @@ function render(state) {
   wrap.innerHTML = entries.map(([store, p]) => {
     const pct = p.total ? Math.round((p.done / p.total) * 100) : 0;
     const label = p.status === "done" ? `<span class="done">¡Carrito listo!</span>`
+      : p.status === "done_partial" ? `<span style="color:#d97706">${p.added || 0}/${p.total} agregados</span>`
       : p.status === "error" ? `<span style="color:#dc2626">Error</span>`
       : p.status === "opening" ? "Conectando…" : `${p.done}/${p.total} productos`;
     return `<div class="store">
