@@ -20,8 +20,14 @@ const clpShort = (n: number) => {
 
 type Summary = {
   config: { presupuesto: number; moneda: string };
+  mesReferencia?: string;
+  mesReferenciaLabel?: string;
+  tarjeta?: {
+    pagoMes: number; presupuesto: number; pctUsado: number; disponible: number;
+    promedio: number; sobrepasa: boolean; serie: { mes: string; total: number }[];
+  };
   resumen: {
-    gastoMes: number; presupuesto: number; pctUsado: number; disponible: number;
+    gastoMes: number; ingresoMes?: number; neto?: number; presupuesto: number; pctUsado: number; disponible: number;
     proyeccion: number; proyeccionSobrepasa: boolean; promedioMensual: number;
     mesActual: string; diaDelMes: number; diasMes: number;
   };
@@ -87,9 +93,11 @@ export default function FinanzasPage() {
   }
 
   const r = data?.resumen;
+  const tc = data?.tarjeta;
   const sinDatos = !data || (data.totalMovimientos ?? 0) === 0;
-  const pct = Math.min(100, r?.pctUsado ?? 0);
+  const pct = Math.min(100, tc?.pctUsado ?? 0);
   const barColor = pct >= 90 ? "#dc2626" : pct >= 70 ? "#f59e0b" : "#4f46e5";
+  const mesLbl = data?.mesReferenciaLabel ?? "";
 
   return (
     <div className="mx-auto max-w-4xl p-6">
@@ -101,7 +109,7 @@ export default function FinanzasPage() {
         <div className="flex-1">
           <h1 className="text-xl font-semibold text-slate-900">Control financiero</h1>
           <p className="text-sm text-slate-500">
-            Tarjeta de crédito Santander · {data?.ultimaImportacion ? `cartola al ${new Date(data.ultimaImportacion.imported_at).toLocaleDateString("es-CL")}` : "sin cartola importada"}
+            Santander{mesLbl ? ` · ${mesLbl}` : ""} {data?.ultimaImportacion ? `· cartola al ${new Date(data.ultimaImportacion.imported_at).toLocaleDateString("es-CL")}` : "· sin cartola importada"}
           </p>
         </div>
         <button onClick={load} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-500 hover:bg-slate-100">
@@ -125,18 +133,21 @@ export default function FinanzasPage() {
         </div>
       )}
 
-      {/* HERO — Presupuesto */}
+      {/* HERO — Pago a la tarjeta vs presupuesto */}
       <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-5">
         <div className="mb-3 flex items-start justify-between">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Gasto del mes</p>
-            <p className="mt-0.5 text-3xl font-bold text-slate-900">{clp(r?.gastoMes ?? 0)}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              Pago a tu tarjeta{mesLbl ? ` · ${mesLbl}` : ""}
+            </p>
+            <p className="mt-0.5 text-3xl font-bold text-slate-900">{clp(tc?.pagoMes ?? 0)}</p>
+            <p className="mt-0.5 text-xs text-slate-400">Lo que pagaste a la tarjeta ese mes (desde la cartola)</p>
           </div>
           <div className="text-right">
             <div className="flex items-center justify-end gap-1 text-xs font-medium uppercase tracking-wide text-slate-400">
-              Presupuesto
+              Tope
               {!editBudget && (
-                <button onClick={() => { setEditBudget(true); setBudgetInput(String(r?.presupuesto ?? 6000000)); }} className="text-slate-300 hover:text-slate-500">
+                <button onClick={() => { setEditBudget(true); setBudgetInput(String(tc?.presupuesto ?? 6000000)); }} className="text-slate-300 hover:text-slate-500">
                   <Pencil className="h-3 w-3" />
                 </button>
               )}
@@ -149,34 +160,53 @@ export default function FinanzasPage() {
                 <button onClick={() => setEditBudget(false)} className="text-slate-400"><X className="h-4 w-4" /></button>
               </div>
             ) : (
-              <p className="mt-0.5 text-2xl font-semibold text-slate-500">{clp(r?.presupuesto ?? 6000000)}</p>
+              <p className="mt-0.5 text-2xl font-semibold text-slate-500">{clp(tc?.presupuesto ?? 6000000)}</p>
             )}
           </div>
         </div>
 
-        {/* Barra de progreso */}
         <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
           <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
         </div>
         <div className="mt-2 flex items-center justify-between text-sm">
-          <span className="font-medium" style={{ color: barColor }}>{r?.pctUsado ?? 0}% usado</span>
-          <span className="text-slate-500">Disponible: <b className="text-slate-700">{clp(r?.disponible ?? 0)}</b></span>
+          <span className="font-medium" style={{ color: barColor }}>{tc?.pctUsado ?? 0}% del tope</span>
+          <span className="text-slate-500">{(tc?.disponible ?? 0) >= 0 ? "Bajo el tope por" : "Sobre el tope por"}: <b className="text-slate-700">{clp(Math.abs(tc?.disponible ?? 0))}</b></span>
         </div>
 
-        {/* Proyección */}
         <div className="mt-4 grid grid-cols-3 gap-3 border-t border-slate-100 pt-4">
-          <Metric label="Proyección cierre" value={clp(r?.proyeccion ?? 0)} danger={r?.proyeccionSobrepasa}
-            hint={r?.proyeccionSobrepasa ? "supera el tope" : "dentro del tope"} />
-          <Metric label="Promedio mensual" value={clp(r?.promedioMensual ?? 0)} hint="últimos 12m" />
-          <Metric label="Día del mes" value={`${r?.diaDelMes ?? 0} / ${r?.diasMes ?? 30}`} hint="del período" />
+          <Metric label="Promedio tarjeta" value={clp(tc?.promedio ?? 0)} hint="pago mensual 12m" />
+          <Metric label="Ingresos del mes" value={clp(r?.ingresoMes ?? 0)} hint="a la cuenta" />
+          <Metric label="Flujo neto" value={clp(r?.neto ?? 0)} danger={(r?.neto ?? 0) < 0}
+            hint={(r?.neto ?? 0) < 0 ? "gastaste más de lo que entró" : "entró más de lo que salió"} />
         </div>
-        {r?.proyeccionSobrepasa && (
+        {tc?.sobrepasa && (
           <div className="mt-3 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
             <AlertTriangle className="h-4 w-4 shrink-0" />
-            Al ritmo actual cerrarías en <b>{clp(r.proyeccion)}</b>, {clp(r.proyeccion - r.presupuesto)} sobre el tope.
+            El pago de tarjeta de {mesLbl} superó el tope en <b>{clp((tc?.pagoMes ?? 0) - (tc?.presupuesto ?? 0))}</b>.
           </div>
         )}
+        <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          ℹ️ La cartola muestra el <b>pago total</b> a la tarjeta, no cada compra. Para ver el detalle itemizado (Netflix, cuotas, cada gasto) hay que activar el <b>Estado de Cuenta de la Tarjeta</b> en el banco.
+        </p>
       </div>
+
+      {/* Flujo de la cuenta corriente (egresos del mes de referencia) */}
+      {(r?.gastoMes ?? 0) > 0 && (
+        <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <p className="text-xs text-slate-400">Egresos del mes</p>
+            <p className="mt-0.5 text-lg font-semibold text-slate-800">{clp(r?.gastoMes ?? 0)}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <p className="text-xs text-slate-400">Ingresos del mes</p>
+            <p className="mt-0.5 text-lg font-semibold text-emerald-700">{clp(r?.ingresoMes ?? 0)}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <p className="text-xs text-slate-400">Egreso promedio 12m</p>
+            <p className="mt-0.5 text-lg font-semibold text-slate-800">{clp(r?.promedioMensual ?? 0)}</p>
+          </div>
+        </div>
+      )}
 
       {/* Anomalías */}
       {(data?.anomalias?.length ?? 0) > 0 && (
@@ -195,28 +225,28 @@ export default function FinanzasPage() {
         </div>
       )}
 
-      {/* Tendencia 12 meses */}
+      {/* Tendencia: pago a la tarjeta por mes */}
       <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-5">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <TrendingUp className="h-4 w-4 text-indigo-500" /> Tendencia 12 meses
+          <TrendingUp className="h-4 w-4 text-indigo-500" /> Pago a la tarjeta · 12 meses
         </h2>
         <div className="h-56 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data?.tendencia ?? []} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+            <BarChart data={tc?.serie ?? []} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
               <XAxis dataKey="mes" tickFormatter={MES_LABEL} tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
               <YAxis tickFormatter={clpShort} tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} width={44} />
               <Tooltip formatter={(v) => clp(Number(v))} labelFormatter={(l) => MES_LABEL(String(l))}
                 contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 12 }} />
-              <ReferenceLine y={r?.presupuesto ?? 6000000} stroke="#dc2626" strokeDasharray="4 4" />
+              <ReferenceLine y={tc?.presupuesto ?? 6000000} stroke="#dc2626" strokeDasharray="4 4" />
               <Bar dataKey="total" radius={[4, 4, 0, 0]}>
-                {(data?.tendencia ?? []).map((m, i) => (
-                  <Cell key={i} fill={m.total > (r?.presupuesto ?? 6000000) ? "#dc2626" : i === (data!.tendencia.length - 1) ? "#4f46e5" : "#c7d2fe"} />
+                {(tc?.serie ?? []).map((m, i) => (
+                  <Cell key={i} fill={m.total > (tc?.presupuesto ?? 6000000) ? "#dc2626" : i === ((tc?.serie.length ?? 1) - 1) ? "#4f46e5" : "#c7d2fe"} />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <p className="mt-1 text-center text-xs text-slate-400">Línea roja = tope de {clpShort(r?.presupuesto ?? 6000000)}</p>
+        <p className="mt-1 text-center text-xs text-slate-400">Línea roja = tope de {clpShort(tc?.presupuesto ?? 6000000)} · barras rojas = meses sobre el tope</p>
       </div>
 
       <div className="grid gap-5 md:grid-cols-2">
