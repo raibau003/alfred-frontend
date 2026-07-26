@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Wallet, TrendingUp, AlertTriangle, RefreshCw, Loader2, Download, Repeat, CreditCard,
-  Layers, Landmark, ArrowDownRight, ArrowUpRight, PiggyBank, X,
+  Layers, Landmark, ArrowDownRight, ArrowUpRight, PiggyBank, X, Search,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine, Cell, PieChart, Pie, Legend,
@@ -55,6 +55,8 @@ export default function FinanzasPage() {
   const [mes, setMes] = useState<string>("");
   const [tab, setTab] = useState<Tab>("Resumen");
   const [catSel, setCatSel] = useState<string>("");
+  const [movQuery, setMovQuery] = useState<string>("");
+  const [movTitular, setMovTitular] = useState<string>("");
 
   const load = useCallback(async () => {
     try {
@@ -82,6 +84,16 @@ export default function FinanzasPage() {
     for (const t of (d?.movimientos ?? [])) { if (t.tipo !== "cargo") continue; const c = t.categoria || "Otros"; acc[c] = (acc[c] || 0) + t.monto; }
     return Object.entries(acc).map(([categoria, monto]) => ({ categoria, monto })).sort((a, b) => b.monto - a.monto);
   }, [d]);
+  // Vista de movimientos: si hay búsqueda → TODAS las categorías; si no → la categoría seleccionada.
+  // Filtro por persona: "Javier" = sus wallet + los de cartola (cuentas propias, titular vacío); "Emi" = solo wallet de Emi.
+  const movsFiltered = useMemo(() => {
+    const q = movQuery.trim().toLowerCase();
+    let base = q ? (d?.movimientos ?? []).filter((m) => m.tipo === "cargo") : (catSel ? movsCat : []);
+    if (q) base = base.filter((m) => (m.comercio || "").toLowerCase().includes(q) || (m.categoria || "").toLowerCase().includes(q) || (m.banco || "").toLowerCase().includes(q));
+    if (movTitular === "Emi") base = base.filter((m) => m.titular === "Emi");
+    else if (movTitular === "Javier") base = base.filter((m) => m.titular === "Javier" || !m.titular);
+    return base;
+  }, [d, movQuery, catSel, movsCat, movTitular]);
 
   if (loading) return <div className="flex h-64 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-slate-300" /></div>;
 
@@ -222,13 +234,39 @@ export default function FinanzasPage() {
             <Card title="Egresos cuenta corriente"><CatPie cats={pm.categorias} /></Card>
             <Card title="Gasto tarjeta"><CatPie cats={pm.categoriasTarjeta} /></Card>
           </div>
-          <Card title="Detalle egresos (cuenta + tarjeta) · todos los meses · tocá una categoría">
-            <CatBars cats={catsAll} onSelect={setCatSel} selected={catSel} />
-          </Card>
-          {catSel && (
-            <Card title={`Detalle · ${catSel} · todos los meses`}>
-              <p className="mb-2 -mt-1 text-xs text-slate-400">Todos los gastos de esta categoría (cuenta corriente + tarjeta), del más grande al más chico.</p>
-              <MovTable movs={movsCat} showCat={false} />
+
+          {/* Buscador global + filtro por persona */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                value={movQuery}
+                onChange={(e) => setMovQuery(e.target.value)}
+                placeholder="Buscar comercio en TODOS los gastos (ej: Uber, Netflix, farmacia)…"
+                className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-8 text-sm outline-none focus:border-indigo-400"
+              />
+              {movQuery && (
+                <button onClick={() => setMovQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
+              )}
+            </div>
+            <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white p-0.5 text-xs">
+              {[["", "Todos"], ["Javier", "🧑 Javier"], ["Emi", "👩 Emi"]].map(([v, l]) => (
+                <button key={v} onClick={() => setMovTitular(v)} className={`rounded-md px-2.5 py-1 font-medium transition-colors ${movTitular === v ? "bg-[#0a1628] text-white" : "text-slate-500 hover:bg-slate-100"}`}>{l}</button>
+              ))}
+            </div>
+          </div>
+
+          {!movQuery && (
+            <Card title="Detalle egresos (cuenta + tarjeta) · todos los meses · tocá una categoría">
+              <CatBars cats={catsAll} onSelect={setCatSel} selected={catSel} />
+            </Card>
+          )}
+
+          {(movQuery || catSel) && (
+            <Card title={movQuery ? `Resultados · “${movQuery}”` : `Detalle · ${catSel} · todos los meses`}>
+              {!movQuery && <p className="mb-2 -mt-1 text-xs text-slate-400">Todos los gastos de esta categoría (cuenta corriente + tarjeta), del más grande al más chico.</p>}
+              {movQuery && movsFiltered.length === 0 && <p className="mb-1 text-xs text-slate-400">Sin resultados para “{movQuery}”{movTitular ? ` de ${movTitular}` : ""}.</p>}
+              <MovTable movs={movsFiltered} showCat={!!movQuery || !catSel} />
             </Card>
           )}
         </div>
