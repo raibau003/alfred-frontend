@@ -40,10 +40,12 @@ type Dash = {
   totalCuotasPendiente: number;
   movimientos: Mov[];
   totalMovimientos: number;
+  mesActual?: string;
+  porTitular?: { titular: string; total: number; esteMes: number; count: number; categorias: { categoria: string; monto: number }[] }[];
 };
 
 const PIE = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#64748b"];
-const TABS = ["Resumen", "Tarjetas", "Cuentas", "Categorías", "Evolución", "Proyección"] as const;
+const TABS = ["Resumen", "Personas", "Tarjetas", "Cuentas", "Categorías", "Evolución", "Proyección"] as const;
 type Tab = typeof TABS[number];
 
 export default function FinanzasPage() {
@@ -229,6 +231,40 @@ export default function FinanzasPage() {
           <Card title="Ingresos · Egresos · 12 meses"><EvolChart data={d!.evolucion} keys={[{ k: "ingresos", c: "#10b981" }, { k: "egresos", c: "#6366f1" }]} tall /></Card>
           <Card title="Resultado neto · 12 meses"><EvolChart data={d!.evolucion} keys={[{ k: "neto", c: "#0ea5e9" }]} tall zero /></Card>
           <Card title="Gasto de tarjeta · 12 meses"><EvolChart data={d!.evolucion} keys={[{ k: "tarjeta", c: "#4f46e5" }]} refLine={presupuesto} tall /></Card>
+        </div>
+      )}
+
+      {/* ─── PERSONAS (quién gasta qué, real-time) ─── */}
+      {tab === "Personas" && (
+        <div className="space-y-4">
+          <p className="text-xs text-slate-400">Gastos en tiempo real por persona (notificaciones del banco vía Wallet).{d!.mesActual ? ` Mes actual: ${d!.mesActual}.` : ""}</p>
+          {(!d!.porTitular || d!.porTitular.length === 0) ? (
+            <Card title="Sin gastos por persona todavía">
+              <p className="text-sm text-slate-500">Cuando lleguen notificaciones del banco (Javier/Emi) vía el Atajo de Wallet, vas a ver acá <b>quién gasta en qué</b>, categorizado y al día.</p>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {d!.porTitular.map((p) => (
+                <Card key={p.titular} title={`${p.titular === "Emi" ? "👩" : "🧑"} ${p.titular}`}>
+                  <div className="mb-3 flex items-end justify-between">
+                    <div><p className="text-[11px] text-slate-400">Este mes</p><p className="text-2xl font-bold text-slate-900">{clp(p.esteMes)}</p></div>
+                    <div className="text-right"><p className="text-[11px] text-slate-400">Total · {p.count} mov.</p><p className="text-sm font-medium text-slate-500">{clp(p.total)}</p></div>
+                  </div>
+                  <div className="space-y-1.5">
+                    {p.categorias.slice(0, 8).map((c) => {
+                      const pct = p.total ? Math.round((c.monto / p.total) * 100) : 0;
+                      return (
+                        <div key={c.categoria}>
+                          <div className="flex justify-between text-xs"><span className="text-slate-600">{c.categoria}</span><span className="text-slate-500">{clp(c.monto)}</span></div>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-indigo-500" style={{ width: `${pct}%` }} /></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
