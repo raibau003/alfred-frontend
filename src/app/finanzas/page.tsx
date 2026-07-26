@@ -20,7 +20,7 @@ const MES_NOM = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", 
 const mesLabel = (k: string) => { const [y, m] = (k || "").split("-"); return `${MES_NOM[Number(m) - 1] ?? m} ${y ?? ""}`.trim(); };
 
 type Cat = { categoria: string; monto: number };
-type Mov = { mes: string; fecha: string; comercio: string; monto: number; tipo: string; categoria: string; producto: string; banco: string };
+type Mov = { mes: string; fecha: string; comercio: string; monto: number; tipo: string; categoria: string; producto: string; banco: string; fuente?: string; titular?: string | null };
 type MesData = {
   santanderCC: { ingresos: number; egresos: number };
   biceCC: { ingresos: number; egresos: number };
@@ -347,7 +347,7 @@ function MovTable({ movs }: { movs: Mov[] }) {
         <tbody>
           {sorted.map((m, i) => (
             <tr key={i} className="border-b border-slate-50">
-              <td className="py-1.5"><span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${m.tipo === "abono" ? "bg-emerald-500" : "bg-slate-300"}`} />{m.comercio}</td>
+              <td className="py-1.5"><span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${m.tipo === "abono" ? "bg-emerald-500" : "bg-slate-300"}`} />{m.comercio}{m.fuente === "wallet" && <span className="ml-1.5 rounded bg-orange-100 px-1 py-0.5 text-[10px] font-medium text-orange-600">📱 {m.titular ?? "celular"}</span>}</td>
               <td className="py-1.5 text-xs text-slate-400">{m.banco} · {m.categoria}</td>
               <td className={`py-1.5 text-right font-medium ${m.tipo === "abono" ? "text-emerald-600" : "text-slate-700"}`}>{m.tipo === "abono" ? "+" : "−"}{clp(m.monto)}</td>
             </tr>
