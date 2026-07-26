@@ -74,6 +74,14 @@ export default function FinanzasPage() {
   const pm = d?.porMes?.[mes];
   const presupuesto = d?.config.presupuesto ?? 6000000;
   const movsMes = useMemo(() => (d?.movimientos ?? []).filter((m) => m.mes === mes), [d, mes]);
+  // TODOS los movimientos de la categoría seleccionada (todos los meses, cuenta + tarjeta).
+  const movsCat = useMemo(() => (d?.movimientos ?? []).filter((m) => m.categoria === catSel && m.tipo === "cargo"), [d, catSel]);
+  // Totales por categoría sobre TODOS los meses (cuenta + tarjeta) → barras coherentes con el detalle.
+  const catsAll = useMemo(() => {
+    const acc: Record<string, number> = {};
+    for (const t of (d?.movimientos ?? [])) { if (t.tipo !== "cargo") continue; const c = t.categoria || "Otros"; acc[c] = (acc[c] || 0) + t.monto; }
+    return Object.entries(acc).map(([categoria, monto]) => ({ categoria, monto })).sort((a, b) => b.monto - a.monto);
+  }, [d]);
 
   if (loading) return <div className="flex h-64 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-slate-300" /></div>;
 
@@ -214,12 +222,13 @@ export default function FinanzasPage() {
             <Card title="Egresos cuenta corriente"><CatPie cats={pm.categorias} /></Card>
             <Card title="Gasto tarjeta"><CatPie cats={pm.categoriasTarjeta} /></Card>
           </div>
-          <Card title="Detalle egresos (cuenta + tarjeta) · tocá una categoría">
-            <CatBars cats={mergeCats(pm.categorias, pm.categoriasTarjeta)} onSelect={setCatSel} selected={catSel} />
+          <Card title="Detalle egresos (cuenta + tarjeta) · todos los meses · tocá una categoría">
+            <CatBars cats={catsAll} onSelect={setCatSel} selected={catSel} />
           </Card>
           {catSel && (
-            <Card title={`Movimientos · ${catSel} · ${mesLabel(mes)}`}>
-              <MovTable movs={movsMes.filter((m) => m.categoria === catSel && m.tipo === "cargo")} />
+            <Card title={`Detalle · ${catSel} · todos los meses`}>
+              <p className="mb-2 -mt-1 text-xs text-slate-400">Todos los gastos de esta categoría (cuenta corriente + tarjeta), del más grande al más chico.</p>
+              <MovTable movs={movsCat} showCat={false} />
             </Card>
           )}
         </div>
@@ -499,22 +508,31 @@ function EvolChart({ data, keys, refLine, tall, zero }: { data: { mes: string }[
     </div>
   );
 }
-function MovTable({ movs }: { movs: Mov[] }) {
-  if (!movs.length) return <Empty text="Sin movimientos este mes." />;
+function MovTable({ movs, showCat = true }: { movs: Mov[]; showCat?: boolean }) {
+  if (!movs.length) return <Empty text="Sin movimientos." />;
   const sorted = [...movs].sort((a, b) => b.monto - a.monto);
+  const total = sorted.reduce((a, m) => a + (m.tipo === "abono" ? -m.monto : m.monto), 0);
+  const fmtF = (f?: string) => { const s = (f || "").slice(0, 10).split("-"); return s.length === 3 ? `${s[2]}/${s[1]}` : ""; };
   return (
-    <div className="max-h-96 overflow-y-auto">
-      <table className="w-full text-sm">
-        <tbody>
-          {sorted.map((m, i) => (
-            <tr key={i} className="border-b border-slate-50">
-              <td className="py-1.5"><span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${m.tipo === "abono" ? "bg-emerald-500" : "bg-slate-300"}`} />{m.comercio}{m.fuente === "wallet" && <span className="ml-1.5 rounded bg-orange-100 px-1 py-0.5 text-[10px] font-medium text-orange-600">📱 {m.titular ?? "celular"}</span>}</td>
-              <td className="py-1.5 text-xs text-slate-400">{m.banco} · {m.categoria}</td>
-              <td className={`py-1.5 text-right font-medium ${m.tipo === "abono" ? "text-emerald-600" : "text-slate-700"}`}>{m.tipo === "abono" ? "+" : "−"}{clp(m.monto)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div>
+      <div className="max-h-[28rem] overflow-y-auto">
+        <table className="w-full text-sm">
+          <tbody>
+            {sorted.map((m, i) => (
+              <tr key={i} className="border-b border-slate-50">
+                <td className="py-1.5 pr-2 align-top text-[11px] text-slate-400 whitespace-nowrap">{fmtF(m.fecha)}</td>
+                <td className="py-1.5"><span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${m.tipo === "abono" ? "bg-emerald-500" : "bg-slate-300"}`} />{m.comercio}{m.fuente === "wallet" && <span className="ml-1.5 rounded bg-orange-100 px-1 py-0.5 text-[10px] font-medium text-orange-600">📱 {m.titular ?? "celular"}</span>}
+                  <span className="block text-[10px] text-slate-400">{m.banco}{showCat ? ` · ${m.categoria}` : ""}{m.producto === "tarjeta_credito" ? " · T.Crédito" : ""}</span>
+                </td>
+                <td className={`py-1.5 text-right font-medium whitespace-nowrap ${m.tipo === "abono" ? "text-emerald-600" : "text-slate-700"}`}>{m.tipo === "abono" ? "+" : "−"}{clp(m.monto)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-semibold text-slate-700">
+        <span>Total ({sorted.length})</span><span>{clp(total)}</span>
+      </div>
     </div>
   );
 }
