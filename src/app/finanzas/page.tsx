@@ -51,6 +51,7 @@ export default function FinanzasPage() {
   const [importing, setImporting] = useState(false);
   const [mes, setMes] = useState<string>("");
   const [tab, setTab] = useState<Tab>("Resumen");
+  const [catSel, setCatSel] = useState<string>("");
 
   const load = useCallback(async () => {
     try {
@@ -210,9 +211,14 @@ export default function FinanzasPage() {
             <Card title="Egresos cuenta corriente"><CatPie cats={pm.categorias} /></Card>
             <Card title="Gasto tarjeta"><CatPie cats={pm.categoriasTarjeta} /></Card>
           </div>
-          <Card title="Detalle egresos (cuenta + tarjeta)">
-            <CatBars cats={mergeCats(pm.categorias, pm.categoriasTarjeta)} />
+          <Card title="Detalle egresos (cuenta + tarjeta) · tocá una categoría">
+            <CatBars cats={mergeCats(pm.categorias, pm.categoriasTarjeta)} onSelect={setCatSel} selected={catSel} />
           </Card>
+          {catSel && (
+            <Card title={`Movimientos · ${catSel} · ${mesLabel(mes)}`}>
+              <MovTable movs={movsMes.filter((m) => m.categoria === catSel && m.tipo === "cargo")} />
+            </Card>
+          )}
         </div>
       )}
 
@@ -281,12 +287,13 @@ function Bar100({ value, max }: { value: number; max: number }) {
     </div>
   );
 }
-function CatBars({ cats }: { cats: Cat[] }) {
+function CatBars({ cats, onSelect, selected }: { cats: Cat[]; onSelect?: (c: string) => void; selected?: string }) {
   if (!cats.length) return <Empty text="Sin datos." />;
   const max = cats[0]?.monto || 1;
   return (
     <div className="space-y-2">{cats.map((c, i) => (
-      <div key={c.categoria}>
+      <div key={c.categoria} onClick={() => onSelect?.(selected === c.categoria ? "" : c.categoria)}
+        className={onSelect ? `cursor-pointer rounded-lg p-1 -m-1 ${selected === c.categoria ? "bg-indigo-50 ring-1 ring-indigo-200" : "hover:bg-slate-50"}` : ""}>
         <div className="flex justify-between text-sm"><span className="text-slate-700">{c.categoria}</span><span className="font-medium text-slate-600">{clp(c.monto)}</span></div>
         <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full" style={{ width: `${(c.monto / max) * 100}%`, backgroundColor: PIE[i % PIE.length] }} /></div>
       </div>))}
