@@ -19,6 +19,7 @@ import {
   Activity,
   Music,
   Target,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -29,6 +30,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/recordatorios", label: "Recordatorios", icon: Bell },
   { href: "/misiones", label: "Misiones", icon: Target },
+  { href: "/finanzas", label: "Finanzas", icon: Wallet },
   { href: "/linea-alfred", label: "Línea de Alfred", icon: Smartphone },
   { href: "/observabilidad", label: "Observabilidad", icon: Activity },
   { href: "/integraciones", label: "Integraciones", icon: Music },
