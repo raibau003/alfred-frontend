@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Copy, Check, Download, Wifi, WifiOff, QrCode, RefreshCw, MessageCircle, Send } from "lucide-react";
+import Link from "next/link";
+import { Copy, Check, Download, Wifi, WifiOff, QrCode, RefreshCw, MessageCircle, Send, Smartphone, Activity, ChevronRight } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import { ROUTER_URL } from "@/lib/alfred/client";
@@ -173,8 +174,22 @@ export default function SettingsPage() {
   return (
     <div className="max-w-2xl space-y-8">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Configuracion</h1>
+        <h1 className="text-xl font-semibold text-slate-900">Configuración</h1>
         <p className="mt-1 text-sm text-slate-400">Tu perfil, canales y conexiones</p>
+      </div>
+
+      {/* Accesos: Línea de Alfred + Observabilidad (movidos del menú) */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Link href="/linea-alfred" className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 hover:border-slate-300 hover:shadow-sm">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700"><Smartphone className="h-5 w-5" /></div>
+          <div className="flex-1"><p className="text-sm font-medium text-slate-800">Línea propia de Alfred</p><p className="text-xs text-slate-400">Número dedicado de WhatsApp</p></div>
+          <ChevronRight className="h-4 w-4 text-slate-300" />
+        </Link>
+        <Link href="/observabilidad" className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 hover:border-slate-300 hover:shadow-sm">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700"><Activity className="h-5 w-5" /></div>
+          <div className="flex-1"><p className="text-sm font-medium text-slate-800">Observabilidad</p><p className="text-xs text-slate-400">Latencia, timeouts, trazas de Alfred</p></div>
+          <ChevronRight className="h-4 w-4 text-slate-300" />
+        </Link>
       </div>
 
       {/* Profile */}

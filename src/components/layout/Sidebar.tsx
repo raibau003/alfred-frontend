@@ -15,11 +15,9 @@ import {
   Loader2,
   FlaskConical,
   Bell,
-  Smartphone,
-  Activity,
-  Music,
   Target,
   Wallet,
+  ShoppingCart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -31,13 +29,11 @@ const navItems = [
   { href: "/recordatorios", label: "Recordatorios", icon: Bell },
   { href: "/misiones", label: "Misiones", icon: Target },
   { href: "/finanzas", label: "Finanzas", icon: Wallet },
-  { href: "/linea-alfred", label: "Línea de Alfred", icon: Smartphone },
-  { href: "/observabilidad", label: "Observabilidad", icon: Activity },
-  { href: "/integraciones", label: "Integraciones", icon: Music },
+  { href: "/shopping", label: "Compras", icon: ShoppingCart },
+  { href: "/connectors", label: "Integraciones", icon: Plug },
   { href: "/agents", label: "Agentes", icon: Bot },
-  { href: "/connectors", label: "Conectores", icon: Plug },
   { href: "/tester", label: "Tester", icon: FlaskConical },
-  { href: "/settings", label: "Configuracion", icon: Settings },
+  { href: "/settings", label: "Configuración", icon: Settings },
 ];
 
 type ServiceStatus = "connected" | "disconnected" | "checking" | "retrying";

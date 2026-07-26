@@ -142,6 +142,9 @@ export default function RecordatoriosPage() {
             {r.outlook_event_id && <span className="inline-flex items-center gap-1 text-blue-500"><Calendar className="h-3 w-3" />en calendario</span>}
           </div>
         </div>
+        {done && (
+          <button onClick={() => reactivate(r.id)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:bg-emerald-50 hover:text-emerald-600" title="Volver a pendiente"><RotateCcw className="h-3.5 w-3.5" /> Pendiente</button>
+        )}
         <button onClick={() => setEditing({ ...r })} className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" title="Editar"><Pencil className="h-4 w-4" /></button>
         <button onClick={() => remove(r.id)} className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Borrar"><Trash2 className="h-4 w-4" /></button>
       </div>
