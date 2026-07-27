@@ -66,6 +66,8 @@ export default function SaludPage() {
               }
               userName={user?.email?.split("@")[0] ?? "Usuario"}
               onNewThread={() => alfred.newThread()}
+              showCart={false}
+              trainingsSheetUrl="https://docs.google.com/spreadsheets/d/1ZdD3JTL4WnVcpTTG7JTFRqh2FqbyK3Wj_zYPSKnWte0/edit"
             />
           </div>
         </div>
