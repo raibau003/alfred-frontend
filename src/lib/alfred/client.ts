@@ -1084,3 +1084,105 @@ export async function sincronizarNotas(persona?: number): Promise<{ mensaje?: st
     return { error: String(e) };
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENTRENAMIENTO — el plan de la semana y sus alternativas
+//
+// La tabla se arma en el router (aTabla) y no acá: los siete días, el estado de cada uno
+// y el resumen son decisiones que también usa WhatsApp, y calcularlas en dos lugares es
+// la receta para que la web y el chat digan cosas distintas del mismo plan.
+
+export interface BloqueEntrenamiento {
+  ejercicio: string;
+  series: number | null;
+  reps: string | null;
+  carga: string | null;
+}
+
+export interface FilaEntrenamiento {
+  dia: string;
+  nombre: string;
+  foco: string;
+  min: number | null;
+  cardio: string;
+  bloques: BloqueEntrenamiento[];
+  estado: "entrena" | "descanso" | "sin_definir";
+}
+
+export interface ResumenEntrenamiento {
+  dias_entrena: number;
+  dias_descanso: number;
+  dias_sin_definir: number;
+  min_semana: number;
+  min_por_sesion: number | null;
+  sin_minutos: string[];
+  completo: boolean;
+}
+
+export interface AlternativaEntrenamiento {
+  id: string | null;
+  nombre: string;
+  enfoque: string;
+  elegido: boolean;
+  tabla: FilaEntrenamiento[];
+  resumen: ResumenEntrenamiento;
+  fuera_de_lote?: boolean;
+}
+
+export interface PlanEntrenamiento {
+  vigente: AlternativaEntrenamiento | null;
+  alternativas: AlternativaEntrenamiento[];
+  generado_en: string | null;
+  kcal_entrenamiento: number;
+  peso: number;
+  error?: string;
+}
+
+const SIN_PLAN: PlanEntrenamiento = {
+  vigente: null, alternativas: [], generado_en: null, kcal_entrenamiento: 0, peso: 80,
+};
+
+export async function getPlanEntrenamiento(): Promise<PlanEntrenamiento> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/entrenamiento/plan`, { headers: await authHeaders() });
+    if (!r.ok) return { ...SIN_PLAN, error: `el router respondió ${r.status}` };
+    return await r.json();
+  } catch (e) {
+    // Se devuelve el error y no un plan vacío: "no pude preguntar" y "no tenés plan" se
+    // ven igual en pantalla, y el primero se arregla reintentando.
+    return { ...SIN_PLAN, error: String(e) };
+  }
+}
+
+export async function generarPlanesEntrenamiento(pedido?: string): Promise<{
+  ok?: boolean; alternativas?: AlternativaEntrenamiento[]; nota?: string | null; error?: string;
+}> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/entrenamiento/generar`, {
+      method: "POST", headers: await authHeaders(),
+      body: JSON.stringify(pedido ? { pedido } : {}),
+      // El coach tarda: arma tres semanas completas. Con el timeout por defecto la
+      // llamada moría antes de que contestara y parecía que no funcionaba.
+      signal: AbortSignal.timeout(300000),
+    });
+    return await r.json();
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
+export async function elegirPlanEntrenamiento(id: string): Promise<{
+  ok?: boolean; nombre?: string; kcal_entrenamiento?: number; aviso?: string | null; error?: string;
+}> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/entrenamiento/elegir`, {
+      method: "POST", headers: await authHeaders(), body: JSON.stringify({ id }),
+    });
+    return await r.json();
+  } catch (e) {
+    return { error: String(e) };
+  }
+}

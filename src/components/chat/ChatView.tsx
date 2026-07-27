@@ -29,7 +29,10 @@ interface Props {
   shoppingMode?: boolean;
   onNewThread?: () => void;
   showCart?: boolean;            // default true; en salud/coach se oculta el carro
-  trainingsSheetUrl?: string;    // si viene, muestra la pesa → abre los entrenamientos generados (Excel)
+  // La pesa del encabezado. Con onTrainings abre la pestaña del plan DENTRO de la vista;
+  // el enlace al Excel queda como respaldo para cuando no hay una vista a la que ir.
+  onTrainings?: () => void;
+  trainingsSheetUrl?: string;
 }
 
 // Extracts search terms from user message (split by commas, "y", newlines)
@@ -102,7 +105,7 @@ function groupProductsBySearchTerm(
   return result;
 }
 
-export function ChatView({ messages, busy, connected, onSend, onStop, userName, onToggleThreads, showThreadsButton, shoppingMode, onNewThread, showCart = true, trainingsSheetUrl }: Props) {
+export function ChatView({ messages, busy, connected, onSend, onStop, userName, onToggleThreads, showThreadsButton, shoppingMode, onNewThread, showCart = true, onTrainings, trainingsSheetUrl }: Props) {
   const [input, setInput] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [reactions, setReactions] = useState<Record<string, "up" | "down">>({});
@@ -227,7 +230,15 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {trainingsSheetUrl && (
+          {onTrainings ? (
+            <button
+              onClick={onTrainings}
+              className="relative flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[10px] text-slate-500 transition-colors hover:bg-slate-50 hover:text-[#0a1628]"
+              title="Ver el entrenamiento de la semana"
+            >
+              <Dumbbell className="h-3.5 w-3.5" />
+            </button>
+          ) : trainingsSheetUrl ? (
             <a
               href={trainingsSheetUrl}
               target="_blank"
@@ -237,7 +248,7 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
             >
               <Dumbbell className="h-3.5 w-3.5" />
             </a>
-          )}
+          ) : null}
           {showCart && (
             <button
               onClick={() => { setCartOpen(!cartOpen); if (!cartOpen) loadCart(); }}
