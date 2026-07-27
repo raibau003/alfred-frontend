@@ -1119,6 +1119,12 @@ export interface ResumenEntrenamiento {
   completo: boolean;
 }
 
+export interface EquipoFaltante {
+  dia: string;
+  ejercicio: string;
+  necesita: string;
+}
+
 export interface AlternativaEntrenamiento {
   id: string | null;
   nombre: string;
@@ -1126,6 +1132,12 @@ export interface AlternativaEntrenamiento {
   elegido: boolean;
   tabla: FilaEntrenamiento[];
   resumen: ResumenEntrenamiento;
+  // "conversacion" = salió de hablar con el coach en la pestaña Deporte. Se distingue
+  // porque es el que trae el contexto que se conversó, y el que uno reconoce.
+  origen?: "generado" | "conversacion";
+  // Ejercicios que piden equipo que no está declarado. El router los calcula para que
+  // WhatsApp pueda avisar lo mismo que la web.
+  equipo_faltante?: EquipoFaltante[];
   fuera_de_lote?: boolean;
 }
 
@@ -1135,6 +1147,7 @@ export interface PlanEntrenamiento {
   generado_en: string | null;
   kcal_entrenamiento: number;
   peso: number;
+  equipo?: string;
   error?: string;
 }
 

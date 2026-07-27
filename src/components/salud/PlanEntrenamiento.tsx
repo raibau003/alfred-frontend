@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Loader2, Check, Sparkles, AlertTriangle, Dumbbell, Moon, Minus, RefreshCw, Salad,
+  MessageSquare, Ban,
 } from "lucide-react";
 import {
   getPlanEntrenamiento, generarPlanesEntrenamiento, elegirPlanEntrenamiento,
@@ -133,7 +134,11 @@ export function PlanEntrenamiento() {
             placeholder="Opcional: 4 días, solo mancuernas, cuidando la rodilla…"
             className="mt-3 w-full max-w-md rounded-lg border border-slate-300 px-3 py-2 text-xs"
           />
-          <p className="mt-2 text-xs text-slate-500">El coach arma tres opciones con enfoques distintos y elegís una.</p>
+          <p className="mt-2 text-xs text-slate-500">
+            El coach arma tres opciones con enfoques distintos y elegís una. También podés
+            armarlo conversando en la pestaña <strong>Deporte</strong>: cada semana que salga
+            de esa charla aparece acá como una alternativa más.
+          </p>
         </div>
       )}
 
@@ -152,8 +157,15 @@ export function PlanEntrenamiento() {
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-slate-800">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
                       {o.fuera_de_lote ? "Plan actual" : `Entrenamiento ${i + 1 - (plan?.vigente?.fuera_de_lote ? 1 : 0)}`}
+                      {/* De dónde salió: el que se armó conversando es el que trae el
+                          contexto que se habló, y conviene poder reconocerlo. */}
+                      {o.origen === "conversacion" && (
+                        <span title="Salió de tu conversación con el coach" className="flex items-center gap-0.5 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-700">
+                          <MessageSquare className="h-2.5 w-2.5" /> del chat
+                        </span>
+                      )}
                     </span>
                     {o.elegido && (
                       <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
@@ -176,6 +188,25 @@ export function PlanEntrenamiento() {
             <>
               {actual.enfoque && (
                 <p className="mb-3 text-xs text-slate-500">{actual.enfoque}</p>
+              )}
+
+              {/* Lo primero que se avisa: un ejercicio que pide una máquina que no tenés no
+                  se puede hacer, y eso invalida el día entero. Pasó de verdad — la primera
+                  tanda traía poleas, prensa y jalón al pecho para alguien que entrena en
+                  casa. Se nombra el ejercicio y qué le falta, porque "no te sirve" sin el
+                  detalle no se puede arreglar. */}
+              {(actual.equipo_faltante?.length ?? 0) > 0 && (
+                <Banda tipo="error" icono={<Ban className="h-3.5 w-3.5 shrink-0" />}>
+                  Este plan pide equipo que no tenés:{" "}
+                  {actual.equipo_faltante!.slice(0, 4).map((f, i) => (
+                    <span key={i}>
+                      {i > 0 && "; "}
+                      <strong>{f.ejercicio}</strong> ({f.necesita}, {f.dia.toLowerCase()})
+                    </span>
+                  ))}
+                  {actual.equipo_faltante!.length > 4 && ` y ${actual.equipo_faltante!.length - 4} más`}
+                  . Pedile al coach que lo rearme con lo que tenés en casa.
+                </Banda>
               )}
 
               {/* Los minutos que faltan cambian las calorías de la pauta, así que se avisa
@@ -221,7 +252,11 @@ export function PlanEntrenamiento() {
             </>
           )}
 
-          <div className="mt-4 flex items-center gap-3">
+          <p className="mt-4 text-[11px] text-slate-400">
+            Lo que armes conversando con el coach en <strong>Deporte</strong> también cae acá
+            como una alternativa más.
+          </p>
+          <div className="mt-2 flex items-center gap-3">
             <input
               value={pedido}
               onChange={(e) => setPedido(e.target.value)}
