@@ -11,7 +11,7 @@ import { ActionButtons } from "./rich/ActionButtons";
 import { ComparisonTable } from "./rich/ComparisonTable";
 import { CartView } from "./rich/CartView";
 import { ShoppingCart } from "./rich/ShoppingCart";
-import { ShoppingCart as ShoppingCartIcon, X as XIcon } from "lucide-react";
+import { ShoppingCart as ShoppingCartIcon, X as XIcon, Dumbbell } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { StoreComparison } from "./rich/StoreComparison";
@@ -28,6 +28,8 @@ interface Props {
   showThreadsButton?: boolean;
   shoppingMode?: boolean;
   onNewThread?: () => void;
+  showCart?: boolean;            // default true; en salud/coach se oculta el carro
+  trainingsSheetUrl?: string;    // si viene, muestra la pesa → abre los entrenamientos generados (Excel)
 }
 
 // Extracts search terms from user message (split by commas, "y", newlines)
@@ -100,7 +102,7 @@ function groupProductsBySearchTerm(
   return result;
 }
 
-export function ChatView({ messages, busy, connected, onSend, onStop, userName, onToggleThreads, showThreadsButton, shoppingMode, onNewThread }: Props) {
+export function ChatView({ messages, busy, connected, onSend, onStop, userName, onToggleThreads, showThreadsButton, shoppingMode, onNewThread, showCart = true, trainingsSheetUrl }: Props) {
   const [input, setInput] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [reactions, setReactions] = useState<Record<string, "up" | "down">>({});
@@ -225,16 +227,29 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => { setCartOpen(!cartOpen); if (!cartOpen) loadCart(); }}
-            className={`relative flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] transition-colors ${cartOpen ? "border-[#e8864a] bg-[#e8864a]/10 text-[#e8864a]" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}
-            title="Carro de compras"
-          >
-            <ShoppingCartIcon className="h-3.5 w-3.5" />
-            {cartItems.length > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#e8864a] text-[8px] font-bold text-white">{cartItems.length}</span>
-            )}
-          </button>
+          {trainingsSheetUrl && (
+            <a
+              href={trainingsSheetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="relative flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[10px] text-slate-500 transition-colors hover:bg-slate-50 hover:text-[#0a1628]"
+              title="Entrenamientos generados (Excel)"
+            >
+              <Dumbbell className="h-3.5 w-3.5" />
+            </a>
+          )}
+          {showCart && (
+            <button
+              onClick={() => { setCartOpen(!cartOpen); if (!cartOpen) loadCart(); }}
+              className={`relative flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] transition-colors ${cartOpen ? "border-[#e8864a] bg-[#e8864a]/10 text-[#e8864a]" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}
+              title="Carro de compras"
+            >
+              <ShoppingCartIcon className="h-3.5 w-3.5" />
+              {cartItems.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#e8864a] text-[8px] font-bold text-white">{cartItems.length}</span>
+              )}
+            </button>
+          )}
           <button
             onClick={() => onNewThread?.()}
             disabled={!onNewThread}
