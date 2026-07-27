@@ -521,3 +521,246 @@ export async function guardarPreferenciasCocina(cambios: PreferenciasCocina): Pr
     return false;
   }
 }
+
+// ── Cocina: menú de la semana, inventario y lista de compras ──────────────────────────
+//
+// Todo lo que sigue existe también por WhatsApp; la web sirve para VER de una vez lo que
+// el chat entrega de a pedazos (las 7 comidas juntas, las 14 cosas de la lista) y para
+// corregir con dos clics lo que por texto son tres mensajes.
+//
+// Nota sobre los tipos: los campos de confianza (`confianza`, `n_observaciones`,
+// `sin_precio`, `unidades_inciertas`) NO son opcionales de adorno. El router los manda
+// justamente para que la UI pueda distinguir lo que sabe de lo que estima, y esconderlos
+// convertiría una estimación honesta en un dato duro.
+
+export interface ItemInventario {
+  id?: number;
+  ingrediente: string;
+  cantidad: number | null;
+  unidad: string | null;
+  zona?: string;
+  visto_en?: string | null;
+  mostrar?: string;
+}
+
+export async function getInventario(zona?: string): Promise<{ items: ItemInventario[]; total: number; por_zona: Record<string, number> }> {
+  try {
+    const url = await getRouterUrl();
+    const q = zona ? `?zona=${encodeURIComponent(zona)}` : "";
+    const r = await fetch(`${url}/inventario${q}`, { headers: await authHeaders() });
+    if (!r.ok) return { items: [], total: 0, por_zona: {} };
+    return await r.json();
+  } catch {
+    return { items: [], total: 0, por_zona: {} };
+  }
+}
+
+export interface PorAcabarse {
+  ingrediente: string;
+  cantidad: number | null;
+  unidad: string | null;
+  dias: number | null;
+  fecha: string | null;
+  confianza: "alta" | "media" | "baja" | "ninguna";
+  n_observaciones?: number;
+  frase?: string;
+  motivo?: string;
+}
+
+export async function getPorAcabarse(dias = 7): Promise<{
+  criticos: PorAcabarse[]; sin_datos: PorAcabarse[]; total_en_casa: number;
+  mensaje: string; nota_sin_datos: string | null;
+}> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/inventario/por-acabarse?dias=${dias}`, { headers: await authHeaders() });
+    if (!r.ok) throw new Error();
+    return await r.json();
+  } catch {
+    return { criticos: [], sin_datos: [], total_en_casa: 0, mensaje: "No pude leer el inventario.", nota_sin_datos: null };
+  }
+}
+
+export async function moverInventario(datos: {
+  ingrediente: string; delta?: number; cantidad?: number; unidad?: string | null; motivo?: string; zona?: string;
+}): Promise<boolean> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/inventario/mover`, {
+      method: "POST", headers: await authHeaders(), body: JSON.stringify(datos),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+export interface PropuestaEscaneo {
+  ingrediente: string; cantidad: number | null; unidad: string | null;
+  mostrar?: string; antes?: string | null; estado: "nuevo" | "actualiza"; duda?: boolean;
+}
+
+// La foto PROPONE. Devuelve lo que vio y el body listo para aplicar, pero no escribe nada
+// hasta que alguien confirme: una foto mal leída no puede reescribir el inventario.
+export async function escanearFoto(imageBase64: string, mimetype = "image/jpeg"): Promise<{
+  ok: boolean; propuesta?: PropuestaEscaneo[]; no_vistos?: string[]; sin_cantidad?: string[];
+  con_duda?: string[]; mensaje?: string; error?: string;
+  para_aplicar?: { endpoint: string; body: Record<string, unknown> };
+}> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/inventario/escaneo-foto`, {
+      method: "POST", headers: await authHeaders(),
+      body: JSON.stringify({ image_base64: imageBase64, mimetype }),
+    });
+    return await r.json();
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+export async function aplicarEscaneo(items: unknown[], zona = "refri"): Promise<boolean> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/inventario/escaneo`, {
+      method: "POST", headers: await authHeaders(), body: JSON.stringify({ items, zona }),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+export interface ComidaMenu {
+  dia: string; fecha?: string; plato_nombre: string; porciones: number;
+  minutos?: number | null; relajado?: string | null; tipo?: string;
+}
+
+export async function proponerMenu(desde?: string, dias = 7, modo?: string): Promise<{
+  comidas: ComidaMenu[]; resumen?: { cocinas: string[]; minutos_totales: number; aviso?: string; descartados_por_tiempo?: number };
+  personas?: string[]; sin_resolver?: unknown[]; vacio?: boolean; mensaje?: string;
+}> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/menu/proponer`, {
+      method: "POST", headers: await authHeaders(), body: JSON.stringify({ desde, dias, modo }),
+    });
+    return await r.json();
+  } catch {
+    return { comidas: [], vacio: true, mensaje: "No pude armar el menú." };
+  }
+}
+
+export async function guardarMenu(desde?: string, dias = 7): Promise<{ ok?: boolean; aviso?: string; error?: string }> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/menu/guardar`, {
+      method: "POST", headers: await authHeaders(), body: JSON.stringify({ desde, dias }),
+    });
+    return await r.json();
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
+export async function getConLoQueHay(maxFaltantes = 2): Promise<{
+  listos: { plato: string; minutos: number | null }[];
+  casi: { plato: string; minutos: number | null; faltan: { ingrediente: string; motivo: string }[] }[];
+  sin_inventario?: boolean; mensaje: string; vacio?: boolean;
+}> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/menu/con-lo-que-hay?max_faltantes=${maxFaltantes}`, { headers: await authHeaders() });
+    return await r.json();
+  } catch {
+    return { listos: [], casi: [], mensaje: "No pude consultar el recetario." };
+  }
+}
+
+export interface ItemLista {
+  id: number; ingrediente: string; cantidad: number | null; unidad: string | null;
+  origen: string; para: string | null; esencial: boolean; estado: string; mostrar?: string;
+}
+
+export async function getLista(): Promise<{ items: ItemLista[]; total: number; esenciales: number; por_origen: Record<string, number> }> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/lista`, { headers: await authHeaders() });
+    if (!r.ok) throw new Error();
+    return await r.json();
+  } catch {
+    return { items: [], total: 0, esenciales: 0, por_origen: {} };
+  }
+}
+
+export async function listaDesdeMenu(): Promise<{ resumen?: string; mensaje?: string; vacio?: boolean }> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/lista/desde-menu`, { method: "POST", headers: await authHeaders(), body: "{}" });
+    return await r.json();
+  } catch {
+    return { mensaje: "No pude armar la lista desde el menú." };
+  }
+}
+
+export async function marcarItemLista(id: number, estado: "pendiente" | "comprado" | "descartado"): Promise<boolean> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/lista/${id}`, {
+      method: "PATCH", headers: await authHeaders(), body: JSON.stringify({ estado }),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+export interface Presupuesto {
+  modo: string; total: number; total_sin_techo?: number; cabe?: boolean; techo?: number;
+  items: { ingrediente: string; costo?: number | null; envases?: number; unidad_incierta?: string }[];
+  recortados?: { ingrediente: string; motivo: string }[];
+  sin_precio?: string[]; nota_sin_precio?: string | null;
+  unidades_inciertas?: string[];
+  alerta_esenciales?: string | null;
+  ahorro_total?: number; sin_opciones?: string[]; nota?: string | null;
+  mensaje?: string; vacio?: boolean;
+}
+
+export async function presupuestar(modo: "libre" | "techo" | "comparado", techo?: number): Promise<Presupuesto> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/lista/presupuestar`, {
+      method: "POST", headers: await authHeaders(), body: JSON.stringify({ modo, techo }),
+    });
+    return await r.json();
+  } catch {
+    return { modo, total: 0, items: [], mensaje: "No pude calcular el presupuesto." };
+  }
+}
+
+export async function buscarPreciosLista(max = 8): Promise<{ mensaje?: string; pendientes?: string[]; error?: string }> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/lista/buscar-precios`, {
+      method: "POST", headers: await authHeaders(), body: JSON.stringify({ max }),
+    });
+    return await r.json();
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
+export async function getSinUsar(): Promise<{
+  parados: { ingrediente: string; dias_sin_uso: number; zona: string; frase: string }[];
+  sugerencias: { plato: string; usa: string[]; faltan: number }[];
+  mensaje: string;
+}> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/habitos/sin-usar`, { headers: await authHeaders() });
+    if (!r.ok) throw new Error();
+    return await r.json();
+  } catch {
+    return { parados: [], sugerencias: [], mensaje: "No pude revisar el inventario." };
+  }
+}

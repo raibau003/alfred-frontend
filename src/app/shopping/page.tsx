@@ -5,8 +5,9 @@ import { useAlfred } from "@/hooks/useAlfred";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ChatView } from "@/components/chat/ChatView";
 import { createClient } from "@/lib/supabase/client";
-import { Puzzle, Download, Loader2, CheckCircle2, X, ShoppingBag, MessageSquare, Settings } from "lucide-react";
+import { Puzzle, Download, Loader2, CheckCircle2, X, ShoppingBag, MessageSquare, Settings, ChefHat } from "lucide-react";
 import { ConfiguracionCompras } from "@/components/shopping/ConfiguracionCompras";
+import { CocinaPanel } from "@/components/shopping/CocinaPanel";
 
 type StoreProgress = Record<string, { name?: string; done: number; total: number; status: string; added?: number; failed?: number }>;
 
@@ -20,7 +21,10 @@ export default function ShoppingPage() {
   const [note, setNote] = useState<string | null>(null);
   // Pestaña activa. La configuración (comuna, programas de socio, costos de despacho) era
   // lo único que solo se podía tocar por WhatsApp o con un curl.
-  const [tab, setTab] = useState<"chat" | "config">("chat");
+  // "cocina" agrupa menú, inventario y lista: son la misma cadena (qué se cocina → qué
+  // falta → cuánto sale) y separarlas en tres pestañas de primer nivel obligaba a saltar
+  // entre ellas para responder una sola pregunta.
+  const [tab, setTab] = useState<"chat" | "cocina" | "config">("chat");
 
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearWatchdog = () => { if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; } };
@@ -97,7 +101,7 @@ export default function ShoppingPage() {
         )}
         {/* Pestañas: el chat sigue primero; la configuración deja de estar escondida. */}
         <div className="ml-3 flex items-center gap-1">
-          {([["chat", "Chat", MessageSquare], ["config", "Configuración", Settings]] as const).map(([k, label, Icon]) => (
+          {([["chat", "Chat", MessageSquare], ["cocina", "Cocina", ChefHat], ["config", "Configuración", Settings]] as const).map(([k, label, Icon]) => (
             <button
               key={k}
               onClick={() => setTab(k)}
@@ -176,6 +180,15 @@ export default function ShoppingPage() {
       {tab === "config" && (
         <div className="min-h-0 flex-1 overflow-y-auto">
           <ConfiguracionCompras />
+        </div>
+      )}
+
+      {/* Menú de la semana, inventario y lista de compras. Todo esto existe por WhatsApp;
+          acá se ve junto, que es lo que el chat no puede hacer: las 7 comidas de una vez,
+          las 14 cosas de la lista, y qué quedó afuera del presupuesto y por qué. */}
+      {tab === "cocina" && (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <CocinaPanel />
         </div>
       )}
 
