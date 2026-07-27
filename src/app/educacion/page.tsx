@@ -10,7 +10,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { ChatView } from "@/components/chat/ChatView";
 import {
   getCalendario, getFuentes, guardarFuente, descubrirCalendario, sincronizarCalendario,
-  getAvisosPendientes, getHogar, getChatsWhatsapp,
+  getAvisosPendientes, getHogar, getChatsWhatsapp, guardarPersona,
   type EventoCalendario, type FuenteCalendario, type Persona, type ChatWhatsapp,
 } from "@/lib/alfred/client";
 
@@ -416,6 +416,8 @@ function Personas({ personas, onCambio, setNota }: {
           chats={chats} onCambio={async () => { await recargar(); onCambio(); }} setNota={setNota} />
       ))}
 
+      <NuevoHijo onListo={async () => { await recargar(); onCambio(); }} setNota={setNota} />
+
       {/* Las fuentes sin dueño quedan visibles: si no, una fuente mal configurada
           desaparecería de la pantalla y seguiría trayendo eventos sin que nadie sepa de dónde. */}
       {fuentes.some(f => !f.persona) && (
@@ -432,6 +434,73 @@ function Personas({ personas, onCambio, setNota }: {
   );
 }
 
+// Agregar un hijo. Nombre, edad y curso en un solo paso, porque sin el curso la persona
+// existe pero su calendario trae solo lo general: quedaría la mitad del trabajo hecho y no
+// habría nada en la pantalla que lo dijera.
+function NuevoHijo({ onListo, setNota }: { onListo: () => void; setNota: (s: string | null) => void }) {
+  const [abierto, setAbierto] = useState(false);
+  const [nombre, setNombre] = useState("");
+  const [edad, setEdad] = useState("");
+  const [curso, setCurso] = useState("");
+  const [colegio, setColegio] = useState("Saint George");
+  const [ocupado, setOcupado] = useState(false);
+
+  if (!abierto) {
+    return (
+      <button onClick={() => setAbierto(true)}
+        className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 px-3 py-3 text-xs font-medium text-slate-500 hover:border-slate-400 hover:bg-slate-50">
+        <Plus className="h-3.5 w-3.5" /> Agregar un hijo
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-300 bg-white p-4">
+      <h3 className="mb-3 text-sm font-semibold text-slate-800">Agregar un hijo</h3>
+      <div className="flex flex-wrap gap-2">
+        <input value={nombre} onChange={e => setNombre(e.target.value)} autoFocus
+          className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs" placeholder="Nombre" />
+        <input value={edad} onChange={e => setEdad(e.target.value)} inputMode="numeric"
+          className="w-20 rounded-lg border border-slate-200 px-3 py-1.5 text-xs" placeholder="edad" />
+        <input value={curso} onChange={e => setCurso(e.target.value)}
+          className="w-24 rounded-lg border border-slate-200 px-3 py-1.5 text-xs" placeholder="curso: 3°E" />
+        <input value={colegio} onChange={e => setColegio(e.target.value)}
+          className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs" placeholder="colegio" />
+      </div>
+      <p className="mt-2 text-[11px] text-slate-500">
+        El curso se escribe como lo escribe el colegio: <code>PK</code>, <code>3°E</code>,{" "}
+        <code>4°B</code>, <code>II medio</code>. Es lo que decide qué eventos le llegan a él y no a
+        sus hermanos. Después de guardarlo podés conectarle su calendario y sus grupos.
+      </p>
+      <div className="mt-3 flex gap-2">
+        <button
+          onClick={async () => {
+            if (!nombre.trim()) { setNota("Falta el nombre."); return; }
+            setOcupado(true);
+            const r = await guardarPersona({
+              nombre: nombre.trim(),
+              edad: edad ? Number(edad) : null,
+              // tipo nino: es lo que hace que los recordatorios se redirijan a un adulto en
+              // vez de mandarle un WhatsApp a un chico.
+              tipo: "nino", rol: "residente",
+              curso: curso.trim() || null, colegio: colegio.trim() || null,
+            });
+            setOcupado(false);
+            if (!r) { setNota("No pude guardarlo. Probá de nuevo."); return; }
+            setNota(null); setAbierto(false); setNombre(""); setEdad(""); setCurso("");
+            onListo();
+          }}
+          disabled={ocupado || !nombre.trim()}
+          className="rounded-lg bg-[#0a1628] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">
+          {ocupado ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Guardar"}
+        </button>
+        <button onClick={() => setAbierto(false)}
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600">Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
 function TarjetaPersona({ persona, fuentes, chats, onCambio, setNota }: {
   persona: Persona; fuentes: FuenteCalendario[]; chats: ChatWhatsapp[];
   onCambio: () => void; setNota: (s: string | null) => void;
@@ -441,7 +510,9 @@ function TarjetaPersona({ persona, fuentes, chats, onCambio, setNota }: {
   const [pagina, setPagina] = useState("https://saintgeorge.cl/familia/calendario/");
   const [feeds, setFeeds] = useState<{ id: string; ics: string }[]>([]);
   const [curso, setCurso] = useState(persona.curso ?? "");
-  const [chatElegido, setChatElegido] = useState("");
+  // Varios grupos a la vez: el del curso, el de mamás y el de la directiva avisan cosas
+  // distintas, y asociarlos de uno en uno es tedioso para nada.
+  const [chatsElegidos, setChatsElegidos] = useState<Set<string>>(new Set());
   const [buscarChat, setBuscarChat] = useState("");
 
   const edad = Number(persona.edad);
@@ -468,7 +539,7 @@ function TarjetaPersona({ persona, fuentes, chats, onCambio, setNota }: {
     });
     setOcupado(false);
     if (r.error) { setNota(r.error); return; }
-    setNota(null); setAgregando(null); setFeeds([]); setChatElegido("");
+    setNota(null); setAgregando(null); setFeeds([]); setChatsElegidos(new Set());
     onCambio();
   };
 
@@ -515,21 +586,57 @@ function TarjetaPersona({ persona, fuentes, chats, onCambio, setNota }: {
           <input value={buscarChat} onChange={e => setBuscarChat(e.target.value)}
             className="w-full rounded border border-slate-200 px-2 py-1 text-xs"
             placeholder="buscar grupo (ej: 3E, PKA, apoderados)" />
-          <div className="max-h-48 space-y-1 overflow-y-auto">
+          <div className="max-h-56 space-y-1 overflow-y-auto">
             {!gruposFiltrados.length && <p className="text-[11px] text-slate-400">Ningún grupo con ese nombre.</p>}
-            {gruposFiltrados.map(c => (
-              <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-xs hover:bg-white">
-                <input type="radio" name={`chat-${persona.id}`} checked={chatElegido === c.id}
-                  onChange={() => setChatElegido(c.id)} />
-                <span className="min-w-0 flex-1 truncate text-slate-700">{c.nombre}</span>
-                {fuentes.some(f => f.url === c.id) && <span className="text-[10px] text-emerald-600">ya está</span>}
-              </label>
-            ))}
+            {gruposFiltrados.map(c => {
+              const yaGuardado = fuentes.some(f => f.url === c.id);
+              return (
+                <label key={c.id}
+                  className={`flex items-center gap-2 rounded px-1 py-0.5 text-xs ${
+                    yaGuardado ? "opacity-50" : "cursor-pointer hover:bg-white"
+                  }`}>
+                  <input type="checkbox" disabled={yaGuardado}
+                    checked={yaGuardado || chatsElegidos.has(c.id)}
+                    onChange={e => setChatsElegidos(prev => {
+                      const n = new Set(prev);
+                      if (e.target.checked) n.add(c.id); else n.delete(c.id);
+                      return n;
+                    })} />
+                  <span className="min-w-0 flex-1 truncate text-slate-700">{c.nombre}</span>
+                  {yaGuardado && <span className="shrink-0 text-[10px] text-emerald-600">ya guardado</span>}
+                </label>
+              );
+            })}
           </div>
-          <button onClick={() => agregar("whatsapp", chatElegido)} disabled={ocupado || !chatElegido}
-            className="flex items-center gap-1 rounded bg-[#0a1628] px-2.5 py-1 text-[11px] text-white disabled:opacity-50">
-            {ocupado ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />} Asociar a {persona.nombre}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                setOcupado(true);
+                // Uno por uno pero en una sola acción: si uno falla, los demás igual quedan
+                // guardados y el error dice cuál fue.
+                const fallaron: string[] = [];
+                for (const id of chatsElegidos) {
+                  const nombreChat = chats.find(x => x.id === id)?.nombre ?? "grupo";
+                  const r = await guardarFuente({
+                    nombre: `${persona.nombre} · ${nombreChat}`,
+                    tipo: "whatsapp", url: id, persona: persona.id,
+                  });
+                  if (r.error) fallaron.push(nombreChat);
+                }
+                setOcupado(false);
+                setNota(fallaron.length ? `No pude guardar: ${fallaron.join(", ")}` : null);
+                setAgregando(null); setChatsElegidos(new Set());
+                onCambio();
+              }}
+              disabled={ocupado || !chatsElegidos.size}
+              className="flex items-center gap-1 rounded bg-[#0a1628] px-2.5 py-1 text-[11px] text-white disabled:opacity-50">
+              {ocupado ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+              Guardar {chatsElegidos.size || ""} para {persona.nombre}
+            </button>
+            <p className="text-[11px] text-slate-500">
+              Leo estos grupos una vez al día y saco lo que tenga fecha.
+            </p>
+          </div>
         </div>
       )}
 
