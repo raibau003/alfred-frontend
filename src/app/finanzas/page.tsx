@@ -28,6 +28,10 @@ type MesData = {
   tarjeta: { gasto: number };
   ingresos: number; egresos: number; neto: number;
   categorias: Cat[]; categoriasTarjeta: Cat[];
+  // true = el mes no tiene NINGÚN movimiento de cuenta corriente, o sea que la cartola no se
+  // ha cargado. Los totales entonces son desconocidos, no cero.
+  faltaCartola?: boolean;
+  movsCC?: number; movsTarjeta?: number;
 };
 type Dash = {
   config: { presupuesto: number; moneda: string };
@@ -128,12 +132,25 @@ export default function FinanzasPage() {
         </div>
       )}
 
+      {/* Sin cartola del mes, los totales de cuenta corriente no son cero: son desconocidos.
+          Mostrarlos como $0 hace pensar que los datos se perdieron — que es exactamente lo
+          que pasó con julio, que tenía la tarjeta cargada y la cartola no. */}
+      {pm?.faltaCartola && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            Todavía no tengo la cartola de cuenta corriente de este mes, así que ingresos, egresos y
+            neto están sin datos — no en cero. El gasto de tarjeta sí está al día.
+          </span>
+        </div>
+      )}
+
       {/* KPIs del mes */}
       {pm && (
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Kpi icon={<ArrowUpRight className="h-4 w-4" />} label="Ingresos" value={clp(pm.ingresos)} color="text-emerald-600" />
-          <Kpi icon={<ArrowDownRight className="h-4 w-4" />} label="Egresos" value={clp(pm.egresos)} color="text-slate-700" />
-          <Kpi icon={<PiggyBank className="h-4 w-4" />} label="Neto" value={clp(pm.neto)} color={pm.neto < 0 ? "text-red-600" : "text-emerald-600"} />
+          <Kpi icon={<ArrowUpRight className="h-4 w-4" />} label="Ingresos" value={pm.faltaCartola ? "—" : clp(pm.ingresos)} color={pm.faltaCartola ? "text-slate-300" : "text-emerald-600"} sub={pm.faltaCartola ? "sin cartola" : undefined} />
+          <Kpi icon={<ArrowDownRight className="h-4 w-4" />} label="Egresos" value={pm.faltaCartola ? "—" : clp(pm.egresos)} color={pm.faltaCartola ? "text-slate-300" : "text-slate-700"} sub={pm.faltaCartola ? "sin cartola" : undefined} />
+          <Kpi icon={<PiggyBank className="h-4 w-4" />} label="Neto" value={pm.faltaCartola ? "—" : clp(pm.neto)} color={pm.faltaCartola ? "text-slate-300" : pm.neto < 0 ? "text-red-600" : "text-emerald-600"} sub={pm.faltaCartola ? "sin cartola" : undefined} />
           <Kpi icon={<CreditCard className="h-4 w-4" />} label="Gasto tarjeta" value={clp(pm.tarjeta.gasto)} color={pm.tarjeta.gasto > presupuesto ? "text-red-600" : "text-indigo-600"} sub={`${Math.round(pm.tarjeta.gasto / presupuesto * 100)}% del tope`} />
         </div>
       )}
@@ -151,9 +168,9 @@ export default function FinanzasPage() {
         <div className="space-y-4">
           <Card title="Flujo del mes">
             <div className="grid grid-cols-3 gap-3 text-center">
-              <Big label="Ingresos" value={clp(pm.ingresos)} color="text-emerald-600" />
-              <Big label="Egresos" value={clp(pm.egresos)} color="text-slate-700" />
-              <Big label="Resultado" value={clp(pm.neto)} color={pm.neto < 0 ? "text-red-600" : "text-emerald-600"} />
+              <Big label="Ingresos" value={pm.faltaCartola ? "—" : clp(pm.ingresos)} color={pm.faltaCartola ? "text-slate-300" : "text-emerald-600"} />
+              <Big label="Egresos" value={pm.faltaCartola ? "—" : clp(pm.egresos)} color={pm.faltaCartola ? "text-slate-300" : "text-slate-700"} />
+              <Big label="Resultado" value={pm.faltaCartola ? "—" : clp(pm.neto)} color={pm.faltaCartola ? "text-slate-300" : pm.neto < 0 ? "text-red-600" : "text-emerald-600"} />
             </div>
           </Card>
           <div className="grid gap-4 md:grid-cols-2">
