@@ -808,3 +808,203 @@ export async function escanearTexto(texto: string): Promise<PropuestaInventario>
     return { ok: false, error: String(e) };
   }
 }
+
+// ── Calendario familiar y automatizaciones ────────────────────────────────────────────
+
+export interface EventoCalendario {
+  id: number;
+  titulo: string;
+  fecha: string;
+  hora_inicio: string | null;
+  fecha_fin: string | null;
+  categoria: string;
+  requiere: string;
+  avisar_horas_antes: number | null;
+  cita: string | null;
+  confianza: "alta" | "media" | "baja";
+  estado: string;
+  notas: string | null;
+  dia_relativo: string;
+  quienes: string[];
+  avisado_en: string | null;
+}
+
+export async function getCalendario(desde?: string, hasta?: string): Promise<{
+  eventos: EventoCalendario[]; total: number;
+  por_categoria: Record<string, number>; accionables: number;
+  personas: Record<string, string>;
+}> {
+  try {
+    const url = await getRouterUrl();
+    const q = new URLSearchParams();
+    if (desde) q.set("desde", desde);
+    if (hasta) q.set("hasta", hasta);
+    const r = await fetch(`${url}/calendario?${q}`, { headers: await authHeaders() });
+    if (!r.ok) throw new Error();
+    return await r.json();
+  } catch {
+    return { eventos: [], total: 0, por_categoria: {}, accionables: 0, personas: {} };
+  }
+}
+
+export interface FuenteCalendario {
+  id: number; nombre: string; tipo: string; url: string | null;
+  persona: number | null; curso: string | null; activa: boolean;
+  ultimo_sync: string | null; ultimo_error: string | null;
+  eventos_ultimo_sync: number | null;
+}
+
+export async function getFuentes(): Promise<{ fuentes: FuenteCalendario[]; con_error: { nombre: string; error: string }[] }> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/calendario/fuentes`, { headers: await authHeaders() });
+    if (!r.ok) throw new Error();
+    return await r.json();
+  } catch {
+    return { fuentes: [], con_error: [] };
+  }
+}
+
+export async function guardarFuente(datos: {
+  nombre: string; tipo: string; url?: string; persona?: number | null; curso?: string | null; cada_horas?: number;
+}): Promise<{ ok?: boolean; error?: string }> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/calendario/fuentes`, {
+      method: "POST", headers: await authHeaders(), body: JSON.stringify(datos),
+    });
+    return await r.json();
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
+// La página del colegio embebe un Google Calendar: de la URL humana sale el feed .ics.
+export async function descubrirCalendario(pagina: string): Promise<{
+  ok: boolean; feeds?: { id: string; ics: string }[]; mensaje?: string; error?: string;
+}> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/calendario/descubrir`, {
+      method: "POST", headers: await authHeaders(), body: JSON.stringify({ url: pagina }),
+    });
+    return await r.json();
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+export async function sincronizarCalendario(): Promise<{ mensaje?: string; error?: string; vacio?: boolean }> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/calendario/sync`, { method: "POST", headers: await authHeaders(), body: "{}" });
+    return await r.json();
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
+export async function crearEvento(datos: {
+  titulo: string; fecha: string; hora_inicio?: string; categoria?: string;
+  para?: number[]; requiere?: string; notas?: string;
+}): Promise<{ ok?: boolean; error?: string }> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/calendario/evento`, {
+      method: "POST", headers: await authHeaders(), body: JSON.stringify(datos),
+    });
+    return await r.json();
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
+export async function getAvisosPendientes(): Promise<{
+  hay: boolean; aviso: { texto: string; cuantos: number; accionable: boolean } | null; pendientes: number; mensaje: string;
+}> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/calendario/avisos`, { headers: await authHeaders() });
+    if (!r.ok) throw new Error();
+    return await r.json();
+  } catch {
+    return { hay: false, aviso: null, pendientes: 0, mensaje: "No pude consultar los avisos." };
+  }
+}
+
+export interface Regla {
+  id: number; nombre: string; cuando: string; condicion: Record<string, unknown>;
+  accion: string; parametros: Record<string, unknown>;
+  nivel: "avisar" | "preparar" | "ejecutar";
+  simulacion: boolean; activa: boolean; veces: number;
+  ultimo_disparo: string | null; descripcion: string | null;
+  descripcion_accion: string; hacia_afuera: boolean;
+  ultimas: { cuando_at: string; hizo: string | null; simulado: boolean; resultado: string }[];
+}
+
+export async function getReglas(): Promise<{ reglas: Regla[]; en_simulacion: number; total: number }> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/reglas`, { headers: await authHeaders() });
+    if (!r.ok) throw new Error();
+    return await r.json();
+  } catch {
+    return { reglas: [], en_simulacion: 0, total: 0 };
+  }
+}
+
+export async function crearRegla(datos: {
+  nombre: string; cuando: string; condicion: Record<string, unknown>;
+  accion: string; parametros: Record<string, unknown>; nivel?: string; descripcion?: string;
+}): Promise<{ ok?: boolean; mensaje?: string; error?: string }> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/reglas`, {
+      method: "POST", headers: await authHeaders(), body: JSON.stringify(datos),
+    });
+    return await r.json();
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
+export async function cambiarRegla(id: number, cambios: Partial<{ activa: boolean; simulacion: boolean; nivel: string }>):
+  Promise<{ ok?: boolean; aviso?: string | null; error?: string }> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/reglas/${id}`, {
+      method: "PATCH", headers: await authHeaders(), body: JSON.stringify(cambios),
+    });
+    return await r.json();
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
+export async function borrarRegla(id: number): Promise<boolean> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/reglas/${id}`, { method: "DELETE", headers: await authHeaders() });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+// Probar una regla con un hecho de mentira. Sin esto, escribir una regla es escribir a
+// ciegas y esperar semanas a ver si acierta.
+export async function probarRegla(regla: unknown, hecho: Record<string, unknown>): Promise<{
+  coincide?: boolean; motivo?: string; porque?: string;
+  decision?: { hacer: string; habria?: string; propuesta?: string; descripcion?: string };
+  error?: string;
+}> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/reglas/probar`, {
+      method: "POST", headers: await authHeaders(), body: JSON.stringify({ regla, hecho }),
+    });
+    return await r.json();
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
