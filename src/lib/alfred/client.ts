@@ -1037,3 +1037,50 @@ export async function eliminarPersona(id: number): Promise<{ ok?: boolean; mensa
     return { error: String(e) };
   }
 }
+
+// ── Seguimiento por persona: notas y lo que se le viene ───────────────────────────────
+
+export interface NotaRamo {
+  asignatura: string;
+  nota: number | null;
+  periodo: string;
+  detalle: string | null;
+  leido_en: string;
+  tendencia: { direccion: "subiendo" | "bajando" | "estable" | "sin_datos"; dif?: number; lecturas: number; motivo?: string };
+}
+
+export interface SeguimientoPersona {
+  id: number; nombre: string; edad: number | null;
+  curso: string | null; colegio: string | null;
+  notas: NotaRamo[];
+  promedio: number | null;
+  proximos: EventoCalendario[];
+  pendientes: EventoCalendario[];
+  ultima_lectura: string | null;
+}
+
+export async function getSeguimiento(): Promise<{
+  personas: SeguimientoPersona[]; sin_notas: string[]; sin_curso: string[]; error?: string;
+}> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/seguimiento`, { headers: await authHeaders() });
+    if (!r.ok) return { personas: [], sin_notas: [], sin_curso: [], error: `HTTP ${r.status}` };
+    return await r.json();
+  } catch (e) {
+    return { personas: [], sin_notas: [], sin_curso: [], error: String(e) };
+  }
+}
+
+export async function sincronizarNotas(persona?: number): Promise<{ mensaje?: string; error?: string }> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/colegio/notas/sync`, {
+      method: "POST", headers: await authHeaders(),
+      body: JSON.stringify(persona ? { persona } : {}),
+    });
+    return await r.json();
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
