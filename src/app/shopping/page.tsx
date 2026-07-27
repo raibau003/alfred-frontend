@@ -5,7 +5,8 @@ import { useAlfred } from "@/hooks/useAlfred";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ChatView } from "@/components/chat/ChatView";
 import { createClient } from "@/lib/supabase/client";
-import { Puzzle, Download, Loader2, CheckCircle2, X, ShoppingBag, MessageSquare, Settings, ChefHat } from "lucide-react";
+import { Puzzle, Download, Loader2, CheckCircle2, X, ShoppingBag, MessageSquare, Settings,
+         CalendarDays, ChefHat, ListChecks } from "lucide-react";
 import { ConfiguracionCompras } from "@/components/shopping/ConfiguracionCompras";
 import { CocinaPanel } from "@/components/shopping/CocinaPanel";
 
@@ -21,10 +22,14 @@ export default function ShoppingPage() {
   const [note, setNote] = useState<string | null>(null);
   // Pestaña activa. La configuración (comuna, programas de socio, costos de despacho) era
   // lo único que solo se podía tocar por WhatsApp o con un curl.
-  // "cocina" agrupa menú, inventario y lista: son la misma cadena (qué se cocina → qué
-  // falta → cuánto sale) y separarlas en tres pestañas de primer nivel obligaba a saltar
-  // entre ellas para responder una sola pregunta.
-  const [tab, setTab] = useState<"chat" | "cocina" | "config">("chat");
+  // Las tres van a PRIMER NIVEL. Antes estaban agrupadas dentro de una sola pestaña
+  // "Cocina", que parecía prolijo —son la misma cadena: qué se cocina → qué falta → cuánto
+  // sale— pero el efecto real fue que ni "Menú" ni "Inventario" ni "Lista" aparecían en
+  // ninguna barra: había que adivinar que estaban adentro. Una función que no se nombra
+  // donde la gente mira es una función que no existe.
+  //
+  // El nombre "Cocina" quedó para la vista del inventario, que es como Javier la llama.
+  const [tab, setTab] = useState<"chat" | "menu" | "inventario" | "lista" | "config">("chat");
 
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearWatchdog = () => { if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; } };
@@ -99,9 +104,15 @@ export default function ShoppingPage() {
             <CheckCircle2 className="h-3 w-3" /> Extensión conectada
           </span>
         )}
-        {/* Pestañas: el chat sigue primero; la configuración deja de estar escondida. */}
+        {/* Pestañas: el chat sigue primero; el resto se nombra por lo que es. */}
         <div className="ml-3 flex items-center gap-1">
-          {([["chat", "Chat", MessageSquare], ["cocina", "Cocina", ChefHat], ["config", "Configuración", Settings]] as const).map(([k, label, Icon]) => (
+          {([["chat", "Chat", MessageSquare],
+             ["menu", "Menú", CalendarDays],
+             // "Cocina" y no "Inventario": es como Javier llama a lo que hay en la casa,
+             // y el nombre de una pestaña sirve para encontrarla, no para clasificarla.
+             ["inventario", "Cocina", ChefHat],
+             ["lista", "Lista", ListChecks],
+             ["config", "Configuración", Settings]] as const).map(([k, label, Icon]) => (
             <button
               key={k}
               onClick={() => setTab(k)}
@@ -186,9 +197,9 @@ export default function ShoppingPage() {
       {/* Menú de la semana, inventario y lista de compras. Todo esto existe por WhatsApp;
           acá se ve junto, que es lo que el chat no puede hacer: las 7 comidas de una vez,
           las 14 cosas de la lista, y qué quedó afuera del presupuesto y por qué. */}
-      {tab === "cocina" && (
+      {(tab === "menu" || tab === "inventario" || tab === "lista") && (
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <CocinaPanel />
+          <CocinaPanel vista={tab} />
         </div>
       )}
 

@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  CalendarDays, Refrigerator, ListChecks, Camera, RefreshCw, Loader2, Check, X,
-  AlertTriangle, Sparkles, Trash2, Search,
+  Camera, RefreshCw, Loader2, Check, X, AlertTriangle, Sparkles, Trash2, Search,
 } from "lucide-react";
 import {
   getInventario, getPorAcabarse, moverInventario, escanearFoto, aplicarEscaneo,
@@ -13,13 +12,15 @@ import {
   type Presupuesto, type PropuestaEscaneo,
 } from "@/lib/alfred/client";
 
-type Vista = "menu" | "inventario" | "lista";
+export type Vista = "menu" | "inventario" | "lista";
 
-const VISTAS = [
-  { k: "menu" as const, t: "Menú", icon: CalendarDays, hint: "qué se cocina esta semana" },
-  { k: "inventario" as const, t: "Inventario", icon: Refrigerator, hint: "qué hay en casa y qué se acaba" },
-  { k: "lista" as const, t: "Lista", icon: ListChecks, hint: "qué comprar y cuánto sale" },
-];
+// Una línea que dice para qué sirve cada vista. Tres pantallas de tablas sin contexto se
+// parecen demasiado entre sí.
+const BAJADA: Record<Vista, string> = {
+  menu: "Qué se cocina esta semana, escalado a quiénes comen en casa.",
+  inventario: "Qué hay en la cocina, a qué ritmo se gasta y qué se está por acabar.",
+  lista: "Qué falta comprar y cuánto sale, en los tres modos de presupuesto.",
+};
 
 // El color de la confianza es la única señal visual de que una fecha es una estimación.
 // Pintarlo todo igual convertiría "podría acabarse el jueves, tengo pocos datos" en un
@@ -44,26 +45,13 @@ function Aviso({ children, tono = "neutro" }: { children: React.ReactNode; tono?
   );
 }
 
-export function CocinaPanel() {
-  const [vista, setVista] = useState<Vista>("menu");
-
+// La vista la manda la página: las pestañas viven en la barra de Compras, no acá adentro.
+// Tener una segunda fila de pestañas dentro de una pestaña escondía "Inventario" de la
+// única barra que la gente mira.
+export function CocinaPanel({ vista }: { vista: Vista }) {
   return (
     <div className="mx-auto max-w-4xl p-4">
-      <div className="mb-4 flex items-center gap-1">
-        {VISTAS.map(({ k, t, icon: Icon, hint }) => (
-          <button
-            key={k}
-            onClick={() => setVista(k)}
-            title={hint}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-              vista === k ? "bg-[#0a1628] text-white" : "text-slate-500 hover:bg-slate-100"
-            }`}
-          >
-            <Icon className="h-3.5 w-3.5" /> {t}
-          </button>
-        ))}
-      </div>
-
+      <p className="mb-4 text-xs text-slate-500">{BAJADA[vista]}</p>
       {vista === "menu" && <VistaMenu />}
       {vista === "inventario" && <VistaInventario />}
       {vista === "lista" && <VistaLista />}
