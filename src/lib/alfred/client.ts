@@ -396,9 +396,15 @@ export interface Persona {
   rol: "residente" | "cocina" | "apoyo";
   whatsapp?: string | null;
   consentimiento_at?: string | null;
+  consentimiento_por?: string | null;
   recibe?: Record<string, boolean>;
   restricciones: Restriccion[];
   pauta?: Pauta | null;
+  // Colegio: el curso es lo que decide qué eventos del calendario le aplican, así que vive
+  // en la persona y no en la fuente. Un hijo puede tener dos colegios y el curso es el mismo.
+  curso?: string | null;
+  colegio?: string | null;
+  correo?: string | null;
 }
 
 export interface Hogar {
@@ -1006,5 +1012,18 @@ export async function probarRegla(regla: unknown, hecho: Record<string, unknown>
     return await r.json();
   } catch (e) {
     return { error: String(e) };
+  }
+}
+
+export interface ChatWhatsapp { id: string; nombre: string; grupo: boolean; ultimo: string | null }
+
+export async function getChatsWhatsapp(): Promise<{ chats: ChatWhatsapp[]; total: number; error?: string }> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/whatsapp/chats?limit=200`, { headers: await authHeaders() });
+    if (!r.ok) return { chats: [], total: 0, error: `HTTP ${r.status}` };
+    return await r.json();
+  } catch (e) {
+    return { chats: [], total: 0, error: String(e) };
   }
 }
