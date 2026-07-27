@@ -764,3 +764,47 @@ export async function getSinUsar(): Promise<{
     return { parados: [], sugerencias: [], mensaje: "No pude revisar el inventario." };
   }
 }
+
+// ── Contarle a Alfred qué hay: por voz, por foto o escribiendo ────────────────────────
+//
+// Los tres devuelven lo mismo —una PROPUESTA— y ninguno escribe. Es deliberado: un audio
+// mal transcrito y una foto mal leída fallan distinto pero se corrigen igual, mirando la
+// lista antes de guardarla.
+
+export interface PropuestaInventario {
+  ok: boolean;
+  origen?: "foto" | "audio" | "texto";
+  propuesta?: PropuestaEscaneo[];
+  no_vistos?: string[];
+  sin_cantidad?: string[];
+  con_duda?: string[];
+  mensaje?: string;
+  error?: string;
+  transcrito?: string;
+  para_aplicar?: { endpoint: string; body: Record<string, unknown> };
+}
+
+export async function escanearAudio(audioBase64: string, mimetype: string): Promise<PropuestaInventario> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/inventario/escaneo-audio`, {
+      method: "POST", headers: await authHeaders(),
+      body: JSON.stringify({ audio_base64: audioBase64, mimetype }),
+    });
+    return await r.json();
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+export async function escanearTexto(texto: string): Promise<PropuestaInventario> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/inventario/escaneo-texto`, {
+      method: "POST", headers: await authHeaders(), body: JSON.stringify({ texto }),
+    });
+    return await r.json();
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}

@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Camera, RefreshCw, Loader2, Check, X, AlertTriangle, Sparkles, Trash2, Search,
+  RefreshCw, Loader2, Check, X, AlertTriangle, Sparkles, Trash2, Search,
 } from "lucide-react";
+import { ChatInventario } from "./ChatInventario";
 import {
-  getInventario, getPorAcabarse, moverInventario, escanearFoto, aplicarEscaneo,
+  getInventario, getPorAcabarse, moverInventario,
   proponerMenu, guardarMenu, getConLoQueHay, getLista, listaDesdeMenu, marcarItemLista,
   presupuestar, buscarPreciosLista, getSinUsar,
   type ItemInventario, type PorAcabarse, type ComidaMenu, type ItemLista,
-  type Presupuesto, type PropuestaEscaneo,
+  type Presupuesto,
 } from "@/lib/alfred/client";
 
 export type Vista = "menu" | "inventario" | "lista";
@@ -177,11 +178,6 @@ function VistaInventario() {
   const [acabarse, setAcabarse] = useState<Awaited<ReturnType<typeof getPorAcabarse>> | null>(null);
   const [parados, setParados] = useState<Awaited<ReturnType<typeof getSinUsar>> | null>(null);
   const [cargando, setCargando] = useState(true);
-  const [propuesta, setPropuesta] = useState<PropuestaEscaneo[] | null>(null);
-  const [escaneo, setEscaneo] = useState<Awaited<ReturnType<typeof escanearFoto>> | null>(null);
-  const [subiendo, setSubiendo] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-
   const recargar = useCallback(async () => {
     setCargando(true);
     const [inv, aca, par] = await Promise.all([getInventario(), getPorAcabarse(7), getSinUsar()]);
@@ -191,76 +187,19 @@ function VistaInventario() {
 
   useEffect(() => { recargar(); }, [recargar]);
 
-  const subirFoto = async (f: File) => {
-    setSubiendo(true); setPropuesta(null);
-    const b64 = await new Promise<string>((res, rej) => {
-      const fr = new FileReader();
-      fr.onload = () => res(String(fr.result).split(",")[1] ?? "");
-      fr.onerror = rej;
-      fr.readAsDataURL(f);
-    });
-    const r = await escanearFoto(b64, f.type || "image/jpeg");
-    setSubiendo(false);
-    setEscaneo(r);
-    if (r.ok && r.propuesta) setPropuesta(r.propuesta);
-  };
-
   return (
     <div className="space-y-4">
+      {/* El chat va PRIMERO: con el inventario vacío es lo único que se puede hacer, y
+          antes la pantalla mostraba "está vacío" con un botón de foto como única salida. */}
+      <ChatInventario onAplicado={recargar} />
+
       <div className="flex flex-wrap items-center gap-2">
         <button onClick={recargar} disabled={cargando}
           className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
           {cargando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Actualizar
         </button>
-        <button onClick={() => fileRef.current?.click()} disabled={subiendo}
-          className="flex items-center gap-1.5 rounded-lg bg-[#0a1628] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">
-          {subiendo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />} Foto del refri
-        </button>
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden"
-          onChange={e => { const f = e.target.files?.[0]; if (f) subirFoto(f); e.target.value = ""; }} />
         <span className="ml-auto text-xs text-slate-400">{items.length} cosa(s) anotadas</span>
       </div>
-
-      {/* La foto propone; hasta que no se confirme, nada se escribe. */}
-      {escaneo && !escaneo.ok && <Aviso tono="alerta">{escaneo.error ?? "No pude leer la foto."}</Aviso>}
-      {propuesta && (
-        <div className="rounded-xl border border-slate-300 bg-white p-4">
-          <p className="mb-2 text-sm font-medium text-slate-800">{escaneo?.mensaje}</p>
-          <div className="mb-3 space-y-1">
-            {propuesta.map(p => (
-              <div key={p.ingrediente} className="flex items-center gap-2 text-xs">
-                <span className={`rounded px-1.5 py-0.5 text-[10px] ${
-                  p.estado === "nuevo" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
-                }`}>{p.estado === "nuevo" ? "nuevo" : "actualiza"}</span>
-                <span className="text-slate-800">{p.ingrediente}</span>
-                <span className="text-slate-500">{p.mostrar || "cantidad desconocida"}</span>
-                {p.antes && <span className="text-slate-400">(antes: {p.antes})</span>}
-                {p.duda && <span className="text-amber-600">· no está seguro</span>}
-              </div>
-            ))}
-          </div>
-          {!!escaneo?.no_vistos?.length && (
-            <p className="mb-3 text-xs text-slate-500">
-              No aparecen en la foto y los dejo como estaban: {escaneo.no_vistos.join(", ")}.
-            </p>
-          )}
-          <div className="flex gap-2">
-            <button
-              onClick={async () => {
-                const body = escaneo?.para_aplicar?.body as { items?: unknown[]; zona?: string } | undefined;
-                if (body?.items) await aplicarEscaneo(body.items, body.zona ?? "refri");
-                setPropuesta(null); setEscaneo(null); recargar();
-              }}
-              className="flex items-center gap-1.5 rounded-lg bg-[#0a1628] px-3 py-1.5 text-xs font-medium text-white">
-              <Check className="h-3.5 w-3.5" /> Confirmar
-            </button>
-            <button onClick={() => { setPropuesta(null); setEscaneo(null); }}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600">
-              <X className="h-3.5 w-3.5" /> Descartar
-            </button>
-          </div>
-        </div>
-      )}
 
       {acabarse && (
         <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -285,7 +224,7 @@ function VistaInventario() {
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         {items.length === 0 && !cargando && (
           <p className="p-4 text-xs text-slate-400">
-            El inventario está vacío. Sacale una foto al refri o contale a Alfred qué hay.
+            Todavía no tengo nada anotado. Contame arriba qué hay: por voz, con una foto o escribiéndolo.
           </p>
         )}
         {items.map(it => (
