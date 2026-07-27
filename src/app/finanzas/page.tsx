@@ -52,6 +52,17 @@ const PIE = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "
 const TABS = ["Resumen", "Personas", "Tarjetas", "Cuentas", "Categorías", "Evolución", "Proyección"] as const;
 type Tab = typeof TABS[number];
 
+// Estado del Atajo del celular. Los "golpes" son los intentos que llegaron al router desde el
+// último arranque: sirven para distinguir "el Atajo no disparó" de "disparó y algo lo rechazó".
+interface AtajoEstado {
+  titulares_configurados?: string[];
+  guardados_hoy?: number;
+  arrancado?: string;
+  golpes?: { cuando: string; resultado: string; titular?: string; monto?: number | null; comercio?: string | null; detalle?: string | null }[];
+  ultimos_guardados?: { fecha: string; titular: string; comercio: string; monto: number; created_at: string }[];
+  error?: string;
+}
+
 export default function FinanzasPage() {
   const [d, setD] = useState<Dash | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,15 +72,36 @@ export default function FinanzasPage() {
   const [catSel, setCatSel] = useState<string>("");
   const [movQuery, setMovQuery] = useState<string>("");
   const [movTitular, setMovTitular] = useState<string>("");
+  const [fallo, setFallo] = useState<string | null>(null);
+  const [atajo, setAtajo] = useState<AtajoEstado | null>(null);
 
   const load = useCallback(async () => {
+    // El `catch {}` que había acá hacía que un router caído se viera EXACTAMENTE igual que
+    // "no tenés gastos": la pestaña Personas decía "Sin gastos por persona todavía" mientras
+    // los dos gastos del día estaban guardados y el endpoint los devolvía bien. Un error de
+    // lectura se dice; si no, se toman decisiones sobre datos que no se leyeron.
     try {
       const r = await fetch("/api/finance/dashboard", { cache: "no-store" });
       const j = await r.json();
-      if (!j.error) { setD(j); setMes((prev) => prev || j.mesReferencia || (j.meses?.[j.meses.length - 1] ?? "")); }
-    } catch {} finally { setLoading(false); }
+      if (j.error) { setFallo(String(j.error)); return; }
+      setFallo(null);
+      setD(j);
+      setMes((prev) => prev || j.mesReferencia || (j.meses?.[j.meses.length - 1] ?? ""));
+    } catch (e) {
+      setFallo((e as Error).message || "no pude conectarme");
+    } finally { setLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  // Se pide solo al abrir Personas: es la única vista que lo muestra y no tiene sentido
+  // pagar la llamada en las otras cinco pestañas.
+  useEffect(() => {
+    if (tab !== "Personas") return;
+    fetch("/api/finance/wallet-estado", { cache: "no-store" })
+      .then((r) => r.json())
+      .then(setAtajo)
+      .catch((e) => setAtajo({ error: (e as Error).message }));
+  }, [tab]);
 
   const importar = async () => {
     setImporting(true);
@@ -124,7 +156,17 @@ export default function FinanzasPage() {
         </button>
       </div>
 
-      {sinDatos && (
+      {fallo && (
+        <div className="mb-5 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            No pude leer tus finanzas ({fallo}). Lo que ves abajo puede estar viejo o incompleto.{" "}
+            <button onClick={load} className="underline">Reintentar</button>
+          </span>
+        </div>
+      )}
+
+      {!fallo && sinDatos && (
         <div className="mb-6 rounded-xl border border-dashed border-emerald-200 bg-emerald-50/50 p-5 text-center">
           <CreditCard className="mx-auto mb-2 h-9 w-9 text-emerald-500" />
           <p className="font-medium text-emerald-800">Aún no importé tus cartolas.</p>
@@ -302,7 +344,18 @@ export default function FinanzasPage() {
       {tab === "Personas" && (
         <div className="space-y-4">
           <p className="text-xs text-slate-400">Gastos en tiempo real por persona (notificaciones del banco vía Wallet).{d!.mesActual ? ` Mes actual: ${d!.mesActual}.` : ""}</p>
-          {(!d!.porTitular || d!.porTitular.length === 0) ? (
+
+          <EstadoAtajo estado={atajo} />
+          {fallo ? (
+            // "No pude preguntar" y "no hay gastos" son cosas distintas y se ven iguales si no
+            // se dicen. Esta pestaña llegó a mostrar "sin gastos" con dos compras guardadas.
+            <Card title="No pude leer los gastos">
+              <p className="text-sm text-slate-500">
+                El router no respondió ({fallo}). Los gastos que hayan llegado por el Atajo siguen guardados: es la
+                lectura la que falló. <button onClick={load} className="underline">Reintentar</button>
+              </p>
+            </Card>
+          ) : (!d!.porTitular || d!.porTitular.length === 0) ? (
             <Card title="Sin gastos por persona todavía">
               <p className="text-sm text-slate-500">Cuando lleguen notificaciones del banco (Javier/Emi) vía el Atajo de Wallet, vas a ver acá <b>quién gasta en qué</b>, categorizado y al día.</p>
             </Card>
@@ -595,4 +648,73 @@ function mergeCats(a: Cat[], b: Cat[]): Cat[] {
   const map: Record<string, number> = {};
   for (const c of [...a, ...b]) map[c.categoria] = (map[c.categoria] || 0) + c.monto;
   return Object.entries(map).map(([categoria, monto]) => ({ categoria, monto })).sort((x, y) => y.monto - x.monto);
+}
+
+// ─── Estado del Atajo de Wallet ───────────────────────────────────────────────
+//
+// Existe por una pregunta concreta: "hice un pago con la tarjeta, ¿te llegó?". Antes había
+// que mirar los logs de Railway —que se borran en cada deploy— y aun así el endpoint no
+// registraba nada. Acá se ven las tres cosas que se confundían: si llegó y se guardó, si
+// llegó y algo lo rechazó, o si nunca llegó.
+function EstadoAtajo({ estado }: { estado: AtajoEstado | null }) {
+  if (!estado) return null;
+  if (estado.error) {
+    return (
+      <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+        No pude consultar el estado del Atajo ({estado.error}).
+      </p>
+    );
+  }
+
+  const ultimo = estado.ultimos_guardados?.[0];
+  const rechazados = (estado.golpes ?? []).filter((g) => g.resultado !== "guardado");
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span className="font-medium text-slate-700">Atajo del celular</span>
+        <span className="text-slate-500">
+          {estado.guardados_hoy ? `${estado.guardados_hoy} gasto(s) recibidos hoy` : "todavía no llegó ningún gasto hoy"}
+        </span>
+        {ultimo && (
+          <span className="text-slate-400">
+            último: {ultimo.comercio} ${ultimo.monto.toLocaleString("es-CL")} ({fmtHora(ultimo.created_at)})
+          </span>
+        )}
+        <span className="text-slate-400">tokens: {(estado.titulares_configurados ?? []).join(", ") || "ninguno"}</span>
+      </div>
+
+      {rechazados.length > 0 && (
+        <div className="mt-2 border-t border-slate-100 pt-2">
+          <p className="text-amber-700">
+            {rechazados.length} intento(s) llegaron y NO se guardaron. Esto es lo que pasó:
+          </p>
+          <ul className="mt-1 space-y-0.5 text-slate-500">
+            {rechazados.slice(0, 5).map((g, i) => (
+              <li key={i}>
+                {fmtHora(g.cuando)} · <b>{g.resultado.replace(/_/g, " ")}</b>
+                {g.comercio ? ` · ${g.comercio}` : ""}
+                {g.detalle ? ` · ${g.detalle}` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Sin esta línea, "0 intentos" se lee como "el Atajo no disparó" cuando en realidad el
+          router se reinició hace un minuto y perdió el registro. */}
+      {(estado.golpes ?? []).length === 0 && (
+        <p className="mt-2 border-t border-slate-100 pt-2 text-slate-400">
+          Sin intentos registrados desde que el router arrancó{estado.arrancado ? ` (${fmtHora(estado.arrancado)})` : ""}.
+          Los gastos guardados antes de eso siguen contados arriba.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function fmtHora(iso: string) {
+  try {
+    return new Date(iso).toLocaleString("es-CL", { timeZone: "America/Santiago", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+  } catch { return iso; }
 }
