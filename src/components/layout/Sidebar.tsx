@@ -18,6 +18,7 @@ import {
   Target,
   Wallet,
   ShoppingCart,
+  HeartPulse,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -29,6 +30,7 @@ const navItems = [
   { href: "/recordatorios", label: "Recordatorios", icon: Bell },
   { href: "/misiones", label: "Misiones", icon: Target },
   { href: "/finanzas", label: "Finanzas", icon: Wallet },
+  { href: "/salud", label: "Salud", icon: HeartPulse },
   { href: "/shopping", label: "Compras", icon: ShoppingCart },
   { href: "/connectors", label: "Integraciones", icon: Plug },
   { href: "/agents", label: "Agentes", icon: Bot },

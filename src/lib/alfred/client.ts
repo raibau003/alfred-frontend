@@ -356,3 +356,168 @@ export async function getDespacho(comuna?: string): Promise<TablaDespacho | null
     return null;
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SALUD — hogar, restricciones y pautas
+//
+// Las restricciones DURAS (alergias) las valida el router con código, no un modelo: es
+// el único lugar donde un error hace daño físico. Acá solo se declaran y se muestran.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface Restriccion {
+  id: number;
+  tipo: "dura" | "blanda";
+  que: string;
+  notas?: string | null;
+}
+
+export interface Pauta {
+  kcal_objetivo?: number;
+  proteina_g?: number;
+  carbo_g?: number;
+  grasa_g?: number;
+  objetivo?: string;
+  gasto_base?: number;
+  gasto_actividad?: number;
+  mantenimiento?: number;
+  explicacion?: string;
+  comidas_por_dia?: number;
+  incompleta?: boolean;
+  faltan?: string[];
+  kcal_entrenamiento?: number;
+  viene_del_coach?: boolean;
+}
+
+export interface Persona {
+  id: number;
+  nombre: string;
+  tipo: "adulto" | "nino";
+  edad?: number | null;
+  rol: "residente" | "cocina" | "apoyo";
+  whatsapp?: string | null;
+  consentimiento_at?: string | null;
+  recibe?: Record<string, boolean>;
+  restricciones: Restriccion[];
+  pauta?: Pauta | null;
+}
+
+export interface Hogar {
+  personas: Persona[];
+  completo: boolean;
+  resumen?: { total: number; adultos: number; ninos: number; con_pauta: number; alergias: number };
+}
+
+export async function getHogar(): Promise<Hogar> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/salud/hogar`, { headers: await authHeaders() });
+    if (!r.ok) return { personas: [], completo: false };
+    return await r.json();
+  } catch {
+    return { personas: [], completo: false };
+  }
+}
+
+export async function guardarPersona(datos: Partial<Persona> & { nombre: string; consentimiento?: boolean }): Promise<Hogar | null> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/salud/personas`, {
+      method: "POST", headers: await authHeaders(), body: JSON.stringify(datos),
+    });
+    if (!r.ok) return null;
+    return (await r.json()).hogar ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Devuelve el hogar actualizado y el `efecto` (qué va a hacer Alfred con esta restricción). */
+export async function agregarRestriccion(
+  persona_id: number, tipo: "dura" | "blanda", que: string, notas?: string,
+): Promise<{ hogar: Hogar; efecto: string } | null> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/salud/restricciones`, {
+      method: "POST", headers: await authHeaders(), body: JSON.stringify({ persona_id, tipo, que, notas }),
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return { hogar: d.hogar, efecto: d.efecto };
+  } catch {
+    return null;
+  }
+}
+
+export async function quitarRestriccion(id: number): Promise<boolean> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/salud/restricciones/${id}`, { method: "DELETE", headers: await authHeaders() });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Calcula la pauta SIN guardarla, para poder verla y conversarla antes de fijarla. */
+export async function calcularPauta(datos: {
+  peso?: number; altura?: number; edad?: number; sexo?: string; vida?: string; objetivo?: string;
+}): Promise<Pauta | null> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/salud/pauta/calcular`, {
+      method: "POST", headers: await authHeaders(), body: JSON.stringify(datos),
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function guardarPauta(persona_id: number, pauta: Pauta): Promise<boolean> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/salud/pauta`, {
+      method: "POST", headers: await authHeaders(), body: JSON.stringify({ persona_id, pauta }),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+export interface PreferenciasCocina {
+  cocinas?: { cocina: string; peso: number }[];
+  no_repetir_dias?: number;
+  tiempo_max_cocina?: number;
+  cena_cocinada?: boolean;
+  comen_almuerzo?: number;
+  comen_cena?: number;
+  dias_fuera?: string[];
+  escaneo_modo?: "auto" | "fijo" | "manual";
+  escaneo_frecuencia?: number;
+  es_default?: boolean;
+}
+
+export async function getPreferenciasCocina(): Promise<PreferenciasCocina> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/salud/preferencias`, { headers: await authHeaders() });
+    if (!r.ok) return {};
+    return await r.json();
+  } catch {
+    return {};
+  }
+}
+
+export async function guardarPreferenciasCocina(cambios: PreferenciasCocina): Promise<boolean> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/salud/preferencias`, {
+      method: "PUT", headers: await authHeaders(), body: JSON.stringify(cambios),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
