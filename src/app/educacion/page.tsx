@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays, GraduationCap, Users, RefreshCw, Loader2, Plus, AlertTriangle,
-  Check, Search, Bell, MessageSquare, X, School, BookOpen, Link2,
+  Check, Search, Bell, MessageSquare, X, School, BookOpen, Link2, Trash2,
 } from "lucide-react";
 import { useAlfred } from "@/hooks/useAlfred";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ChatView } from "@/components/chat/ChatView";
 import {
   getCalendario, getFuentes, guardarFuente, descubrirCalendario, sincronizarCalendario,
-  getAvisosPendientes, getHogar, getChatsWhatsapp, guardarPersona,
+  getAvisosPendientes, getHogar, getChatsWhatsapp, guardarPersona, eliminarPersona,
   type EventoCalendario, type FuenteCalendario, type Persona, type ChatWhatsapp,
 } from "@/lib/alfred/client";
 
@@ -48,7 +48,10 @@ const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "o
 export default function EducacionPage() {
   const { user } = useAuth();
   const alfred = useAlfred();
-  const [vista, setVista] = useState<Vista>("proximo");
+  // El año arranca primero: es la foto completa, y desde ahí se pincha un día para ver el
+  // detalle. "Lo que viene" sigue existiendo para la lectura secuencial, pero la pregunta
+  // que uno trae al abrir esto es "cómo viene el año", no "qué hay mañana".
+  const [vista, setVista] = useState<Vista>("año");
   const [eventos, setEventos] = useState<EventoCalendario[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -98,7 +101,7 @@ export default function EducacionPage() {
       <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 bg-white px-4 py-2">
         <GraduationCap className="h-4 w-4 text-[#0a1628]" />
         <span className="mr-3 text-sm font-semibold text-slate-800">Educación y calendario</span>
-        {([["proximo", "Lo que viene", Bell], ["año", "El año", CalendarDays],
+        {([["año", "El año", CalendarDays], ["proximo", "Lo que viene", Bell],
            ["personas", "Personas y fuentes", Users], ["chat", "Preguntar", MessageSquare]] as const)
           .map(([k, label, Icon]) => (
             <button key={k} onClick={() => setVista(k)}
@@ -307,6 +310,13 @@ function Fila({ e, destacar = false }: { e: EventoCalendario; destacar?: boolean
 
 function VistaAño({ eventos }: { eventos: EventoCalendario[] }) {
   const año = Number((eventos[0]?.fecha ?? new Date().toISOString()).slice(0, 4));
+  const hoy = new Date().toISOString().slice(0, 10);
+  // El día abierto y el que está bajo el mouse son distintos: uno se sostiene al hacer clic
+  // y el otro es un vistazo. Con una sola variable, mover el mouse borraba lo que se había
+  // pinchado para leer con calma.
+  const [elegido, setElegido] = useState<string | null>(null);
+  const [encima, setEncima] = useState<string | null>(null);
+
   const porDia = useMemo(() => {
     const m = new Map<string, EventoCalendario[]>();
     for (const e of eventos) {
@@ -315,6 +325,9 @@ function VistaAño({ eventos }: { eventos: EventoCalendario[] }) {
     }
     return m;
   }, [eventos]);
+
+  const diaAbierto = elegido ?? encima;
+  const delDia = diaAbierto ? (porDia.get(diaAbierto) ?? []) : [];
 
   return (
     <div className="space-y-3">
@@ -327,21 +340,31 @@ function VistaAño({ eventos }: { eventos: EventoCalendario[] }) {
             <div key={mes} className="rounded-xl border border-slate-200 bg-white p-3">
               <p className="mb-2 text-xs font-semibold capitalize text-slate-700">{mes}</p>
               <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-slate-300">
-                {["L", "M", "M", "J", "V", "S", "D"].map((d, k) => <span key={k}>{d}</span>)}
-                {Array.from({ length: offset }, (_, k) => <span key={`v${k}`} />)}
+                {["L", "M", "M", "J", "V", "S", "D"].map((d, k) => <span key={`${mes}-h${k}`}>{d}</span>)}
+                {Array.from({ length: offset }, (_, k) => <span key={`${mes}-v${k}`} />)}
                 {Array.from({ length: dias }, (_, k) => {
                   const f = `${año}-${mm}-${String(k + 1).padStart(2, "0")}`;
                   const evs = porDia.get(f) ?? [];
                   const conAccion = evs.find(e => e.requiere && e.requiere !== "nada");
                   const cat = (conAccion ?? evs[0])?.categoria;
+                  const esHoy = f === hoy;
+                  const abierto = diaAbierto === f;
                   return (
-                    <span key={f}
-                      title={evs.length ? evs.map(e => `${e.titulo}${e.quienes.length ? ` (${e.quienes.join(", ")})` : ""}`).join(" · ") : undefined}
-                      className={`flex h-5 items-center justify-center rounded ${
+                    <button key={f} type="button"
+                      onClick={() => setElegido(elegido === f ? null : f)}
+                      onMouseEnter={() => setEncima(f)}
+                      onMouseLeave={() => setEncima(null)}
+                      disabled={!evs.length && !esHoy}
+                      title={evs.length ? `${evs.length} cosa(s)` : undefined}
+                      className={`flex h-5 items-center justify-center rounded transition-all ${
                         cat ? `${color(cat).punto} font-medium text-white` : "text-slate-400"
-                      } ${conAccion ? "ring-1 ring-slate-900 ring-offset-1" : ""}`}>
+                      } ${conAccion ? "ring-1 ring-slate-900 ring-offset-1" : ""} ${
+                        abierto ? "scale-125 shadow-md" : ""
+                      } ${esHoy && !cat ? "font-bold text-slate-900 underline" : ""} ${
+                        evs.length ? "cursor-pointer hover:brightness-110" : "cursor-default"
+                      }`}>
                       {k + 1}
-                    </span>
+                    </button>
                   );
                 })}
               </div>
@@ -349,12 +372,66 @@ function VistaAño({ eventos }: { eventos: EventoCalendario[] }) {
           );
         })}
       </div>
+
+      {/* El detalle vive abajo y no en un tooltip: un tooltip se va al mover el mouse y no se
+          puede leer una lista de cinco cosas. Pasar por encima lo previsualiza, hacer clic lo
+          fija. */}
+      {diaAbierto && (
+        <div className="sticky bottom-0 rounded-xl border border-slate-300 bg-white p-4 shadow-lg">
+          <div className="mb-2 flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-slate-400" />
+            <span className="text-sm font-semibold text-slate-800">{fechaLarga(diaAbierto)}</span>
+            {elegido === diaAbierto && (
+              <button onClick={() => setElegido(null)} className="ml-auto text-slate-300 hover:text-slate-700">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          {!delDia.length
+            ? <p className="text-xs text-slate-400">Nada anotado ese día.</p>
+            : <div className="space-y-1">{delDia.map(e => <DetalleEvento key={e.id} e={e} />)}</div>}
+        </div>
+      )}
+
       <p className="text-[11px] text-slate-400">
-        El borde negro marca los días que requieren preparar algo. Los filtros de arriba también
-        aplican acá: elegí a Bauti y el año queda con lo suyo.
+        Pasá el mouse por un día para verlo, o hacé clic para dejarlo fijo. El borde negro marca los
+        días que requieren preparar algo; los filtros de arriba también aplican acá.
       </p>
     </div>
   );
+}
+
+// Una fila de detalle: lo mismo que muestra "Lo que viene", porque es la misma pregunta
+// —qué hay y qué tengo que hacer— hecha desde otro lado.
+function DetalleEvento({ e }: { e: EventoCalendario }) {
+  const c = color(e.categoria);
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5">
+      <span className={`h-2 w-2 shrink-0 rounded-full ${c.punto}`} title={c.label} />
+      <span className="min-w-0 flex-1 text-xs text-slate-800">{e.titulo}</span>
+      {e.hora_inicio && <span className="text-[11px] text-slate-500">{e.hora_inicio.slice(0, 5)}</span>}
+      {e.quienes.length > 0 && (
+        <span className="rounded bg-white px-1.5 py-0.5 text-[10px] text-slate-600">{e.quienes.join(", ")}</span>
+      )}
+      {e.requiere && e.requiere !== "nada" && (
+        <span className="rounded bg-slate-900 px-1.5 py-0.5 text-[10px] text-white">
+          {REQUIERE[e.requiere] ?? e.requiere}
+        </span>
+      )}
+      {e.confianza !== "alta" && (
+        <span className="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">
+          a confirmar
+        </span>
+      )}
+      {/* La cita completa, no truncada: es lo que permite decidir si el evento es real. */}
+      {e.cita && <p className="w-full text-[11px] italic text-slate-500">{e.cita}</p>}
+    </div>
+  );
+}
+
+function fechaLarga(f: string) {
+  const d = new Date(`${f}T12:00:00Z`);
+  return d.toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
 }
 
 // ── Personas y fuentes ───────────────────────────────────────────────────────────────
@@ -514,6 +591,7 @@ function TarjetaPersona({ persona, fuentes, chats, onCambio, setNota }: {
   // distintas, y asociarlos de uno en uno es tedioso para nada.
   const [chatsElegidos, setChatsElegidos] = useState<Set<string>>(new Set());
   const [buscarChat, setBuscarChat] = useState("");
+  const [confirmar, setConfirmar] = useState(false);
 
   const edad = Number(persona.edad);
   const esNiño = Number.isFinite(edad) && edad < 18;
@@ -552,6 +630,24 @@ function TarjetaPersona({ persona, fuentes, chats, onCambio, setNota }: {
         <span className="ml-auto text-[11px] text-slate-400">
           {fuentes.length ? `${fuentes.length} fuente(s)` : "sin fuentes"}
         </span>
+        {/* Confirmación en dos pasos y en el mismo botón: un diálogo del navegador para esto
+            es más molesto que útil, pero borrar de un clic una persona con fuentes tampoco. */}
+        <button
+          onClick={async () => {
+            if (!confirmar) { setConfirmar(true); setTimeout(() => setConfirmar(false), 4000); return; }
+            setOcupado(true);
+            const r = await eliminarPersona(persona.id);
+            setOcupado(false);
+            setNota(r.error ?? r.mensaje ?? null);
+            onCambio();
+          }}
+          disabled={ocupado}
+          title={confirmar ? "Confirmá" : `Sacar a ${persona.nombre} del hogar`}
+          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${
+            confirmar ? "bg-rose-600 text-white" : "text-slate-300 hover:text-rose-500"
+          }`}>
+          {confirmar ? "¿seguro?" : <Trash2 className="h-3.5 w-3.5" />}
+        </button>
       </div>
 
       {fuentes.length > 0 && (

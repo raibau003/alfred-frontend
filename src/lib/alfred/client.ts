@@ -1027,3 +1027,13 @@ export async function getChatsWhatsapp(): Promise<{ chats: ChatWhatsapp[]; total
     return { chats: [], total: 0, error: String(e) };
   }
 }
+
+export async function eliminarPersona(id: number): Promise<{ ok?: boolean; mensaje?: string; error?: string }> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/salud/personas/${id}`, { method: "DELETE", headers: await authHeaders() });
+    return await r.json();
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
