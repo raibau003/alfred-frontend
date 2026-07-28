@@ -1,0 +1,46 @@
+#!/bin/sh
+# El clon principal es la estación de merge de todas las sesiones: `main` está
+# checkouteado ahí y desde ahí publica todo el mundo. Un commit propio en esa carpeta
+# —en main o en una rama cualquiera— la deja ocupada, y así es como dos sesiones
+# terminan pisándose. El trabajo va en un worktree.
+#
+# Los merges NO pasan por este hook (git usa pre-merge-commit), así que
+# "git merge feat/loquesea" desde el clon principal sigue funcionando.
+#
+# Se activa con:  git config core.hooksPath .githooks
+
+# Un merge LIMPIO no pasa por acá (git usa pre-merge-commit), pero uno con CONFLICTOS se
+# cierra con `git commit` y sí llega. Sin esta salida, resolver un conflicto en main sería
+# imposible sin --no-verify — y un hook que obliga a saltárselo deja de proteger nada.
+if [ -f "$(git rev-parse --git-dir)/MERGE_HEAD" ]; then
+  exit 0
+fi
+
+# En un worktree el git-dir es <repo>/.git/worktrees/<nombre>; en el clon principal es
+# <repo>/.git a secas. Los worktrees son justamente el lugar donde SÍ hay que commitear.
+case "$(git rev-parse --absolute-git-dir)" in
+  */.git/worktrees/*) exit 0 ;;
+esac
+
+rama=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+cat >&2 <<EOF
+✋ Commit en el clon principal (rama: ${rama:-?}), rechazado.
+
+De esta carpeta mergean todas las sesiones. Si queda con cambios tuyos, o parada en una
+rama que no es main, ninguna otra sesión puede publicar. Acá solo se mergea.
+
+Para trabajar, tu propia carpeta y tu propia rama:
+
+    git worktree add .claude/worktrees/<tema> -b feat/<tema> origin/main
+    cd .claude/worktrees/<tema>
+
+Si ya hiciste los cambios acá, llévalos a tu worktree sin perderlos:
+
+    git stash push -- <tus archivos>     # por ruta, nunca -a ni -A
+    git worktree add .claude/worktrees/<tema> -b feat/<tema> origin/main
+    cd .claude/worktrees/<tema> && git stash pop
+
+Ver CLAUDE.md → "Trabajo en paralelo".
+EOF
+exit 1

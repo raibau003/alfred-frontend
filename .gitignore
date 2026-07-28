@@ -1,3 +1,7 @@
 .vercel
 .next/
-node_modules/
+node_modules
+
+# Los worktrees de cada sesión y el symlink a node_modules: nada de esto va al
+# historial, y sin la línea aparecen como `??` en cada git status.
+.claude/
