@@ -133,6 +133,11 @@ export function useAlfred(threadId?: string, chatKey?: string) {
   const startPolling = useCallback(
     () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      // Dónde empieza ESTE turno. Todo lo anterior es historial heredado del chat: si se
+      // mira para decidir si "ya hay respuesta", una respuesta vieja y larga da el sí en el
+      // primer poll y el chat se declara listo a los 6 segundos — mientras el agente recién
+      // empieza. Es lo que dejaba el chat en "Preparando tu rutina..." para siempre.
+      const desdeIdx = pintadosRef.current;
       let lastMsgCount = 0;
       let stablePolls = 0;
       let foundFinal = false;
@@ -190,7 +195,7 @@ export function useAlfred(threadId?: string, chatKey?: string) {
             if (pollRef.current) clearInterval(pollRef.current);
             setBusy(false);
             setMessages(prev => prev.filter(m => !m.id.startsWith("hb-")));
-            const lastReal = msgs.filter(m => m.role === "assistant" && m.text.length > 30 && !isProgress(m.text)).pop();
+            const lastReal = msgs.slice(desdeIdx).filter(m => m.role === "assistant" && m.text.length > 30 && !isProgress(m.text)).pop();
             if (lastReal) saveMessage("assistant", lastReal.text, lastReal.agent, lastReal.rich);
             return;
           }
@@ -203,13 +208,13 @@ export function useAlfred(threadId?: string, chatKey?: string) {
             lastMsgCount = msgs.length;
           }
 
-          const hasRealResponse = msgs.some(m => m.role === "assistant" && m.text.length > 50 && !isProgress(m.text));
+          const hasRealResponse = msgs.slice(desdeIdx).some(m => m.role === "assistant" && m.text.length > 50 && !isProgress(m.text));
           if (hasRealResponse && stablePolls >= 3) {
             foundFinal = true;
             if (pollRef.current) clearInterval(pollRef.current);
             setBusy(false);
             setMessages(prev => prev.filter(m => !m.id.startsWith("hb-")));
-            const lastReal = msgs.filter(m => m.role === "assistant" && m.text.length > 30 && !isProgress(m.text)).pop();
+            const lastReal = msgs.slice(desdeIdx).filter(m => m.role === "assistant" && m.text.length > 30 && !isProgress(m.text)).pop();
             if (lastReal) saveMessage("assistant", lastReal.text, lastReal.agent, lastReal.rich);
             return;
           }
