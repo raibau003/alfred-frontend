@@ -25,13 +25,13 @@ export interface AlfredMessage {
   rich?: { type: string; products?: any[]; actions?: any[]; [key: string]: any };
 }
 
-export async function createSession(title: string, userId?: string): Promise<string | null> {
+export async function createSession(title: string, userId?: string, chatId?: string): Promise<string | null> {
   try {
     const url = await getRouterUrl();
     const resp = await fetch(`${url}/session`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ directory: "/home/agent/sandbox", title, user_id: userId }),
+      body: JSON.stringify({ directory: "/home/agent/sandbox", title, user_id: userId, chat_id: chatId }),
     });
     const data = await resp.json();
     return data?.id ?? null;

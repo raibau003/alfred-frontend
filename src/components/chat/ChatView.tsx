@@ -32,6 +32,9 @@ interface Props {
   // La pesa del encabezado. Con onTrainings abre la pestaña del plan DENTRO de la vista;
   // el enlace al Excel queda como respaldo para cuando no hay una vista a la que ir.
   onTrainings?: () => void;
+  // Los atajos de abajo. Los genéricos ("Busca alternativas") mandados a un nutricionista
+  // disparaban una búsqueda web de links sueltos: cada asesor necesita los suyos.
+  sugerencias?: string[];
   trainingsSheetUrl?: string;
 }
 
@@ -105,7 +108,7 @@ function groupProductsBySearchTerm(
   return result;
 }
 
-export function ChatView({ messages, busy, connected, onSend, onStop, userName, onToggleThreads, showThreadsButton, shoppingMode, onNewThread, showCart = true, onTrainings, trainingsSheetUrl }: Props) {
+export function ChatView({ messages, busy, connected, onSend, onStop, userName, onToggleThreads, showThreadsButton, shoppingMode, onNewThread, showCart = true, onTrainings, trainingsSheetUrl, sugerencias }: Props) {
   const [input, setInput] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [reactions, setReactions] = useState<Record<string, "up" | "down">>({});
@@ -561,7 +564,7 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
           {/* Follow-up suggestions after last response */}
           {!busy && messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && !messages[messages.length - 1]?.content.includes("% (~") && messages[messages.length - 1]?.content.length > 50 && (
             <div className="flex flex-wrap gap-1.5 mt-2 px-1">
-              {["Dame mas detalles", "Que mas puedes hacer con esto?", "Busca alternativas"].map(q => (
+              {(sugerencias ?? ["Dame mas detalles", "Que mas puedes hacer con esto?", "Busca alternativas"]).map(q => (
                 <button key={q} onClick={() => onSend(q)} className="rounded-full border border-slate-200 px-3 py-1 text-[10px] text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition-colors">
                   {q}
                 </button>

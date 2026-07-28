@@ -14,7 +14,14 @@ export interface ChatMessage {
   rich?: { type: string; products?: any[]; actions?: any[]; [key: string]: any };
 }
 
-export function useAlfred(threadId?: string) {
+/**
+ * @param threadId  hilo persistido en Supabase, si se está retomando uno
+ * @param chatKey   identifica la CONVERSACIÓN en el router. Dos vistas del mismo usuario
+ *                  (el coach y el nutricionista) tienen que mandar claves distintas: el
+ *                  router hereda el historial por chat, y con la misma clave cada pestaña
+ *                  recibía las respuestas de la otra.
+ */
+export function useAlfred(threadId?: string, chatKey?: string) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
@@ -60,12 +67,13 @@ export function useAlfred(threadId?: string) {
   // Initialize Router session
   const initSession = useCallback(async () => {
     if (sessionRef.current) return;
-    const sid = await createSession(`Web ${user?.email ?? "user"}`, user?.id);
+    const sid = await createSession(`Web ${user?.email ?? "user"}`, user?.id,
+      chatKey ? `web:${chatKey}:${user?.email ?? "user"}` : undefined);
     if (sid) {
       sessionRef.current = sid;
       setConnected(true);
     }
-  }, [user]);
+  }, [user, chatKey]);
 
   useEffect(() => {
     initSession();

@@ -30,8 +30,10 @@ export default function SaludPage() {
   // aparecía todo lo hablado con el coach —planes de entrenamiento incluidos— y el
   // nutricionista parecía estar contestando cosas de deporte. Son dos asesores distintos y
   // cada uno tiene que tener su propio hilo.
-  const coach = useAlfred();
-  const nutricionista = useAlfred();
+  // La clave separa las conversaciones EN EL ROUTER, no solo en pantalla: el historial se
+  // hereda por chat, así que con la misma clave el nutricionista recibía lo del coach.
+  const coach = useAlfred(undefined, "salud-coach");
+  const nutricionista = useAlfred(undefined, "salud-nutricion");
   const [tab, setTab] = useState<Tab>("deporte");
   const alfred = tab === "nutricion" ? nutricionista : coach;
 
@@ -84,6 +86,9 @@ export default function SaludPage() {
               // La pesa del encabezado abre la tabla acá mismo en vez de mandar a una
               // planilla afuera: el plan de la semana es parte de la app, no un adjunto.
               onTrainings={() => setTab("plan")}
+              sugerencias={tab === "deporte"
+                ? ["¿Qué toca hoy?", "Ya entrené", "Ajustá el plan"]
+                : ["Armá mi pauta", "¿Qué como hoy?", "Cambiá una comida"]}
             />
           </div>
         </div>
