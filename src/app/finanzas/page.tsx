@@ -58,7 +58,8 @@ interface AtajoEstado {
   titulares_configurados?: string[];
   guardados_hoy?: number;
   arrancado?: string;
-  golpes?: { cuando: string; resultado: string; titular?: string; monto?: number | null; comercio?: string | null; detalle?: string | null }[];
+  golpes?: { cuando: string; resultado: string; titular?: string; monto?: number | null; comercio?: string | null; detalle?: string | null; desde?: string }[];
+  atajo_sano?: boolean;
   ultimos_guardados?: { fecha: string; titular: string; comercio: string; monto: number; created_at: string }[];
   error?: string;
 }
@@ -686,13 +687,19 @@ function EstadoAtajo({ estado }: { estado: AtajoEstado | null }) {
 
       {rechazados.length > 0 && (
         <div className="mt-2 border-t border-slate-100 pt-2">
-          <p className="text-amber-700">
-            {rechazados.length} intento(s) llegaron y NO se guardaron. Esto es lo que pasó:
+          {/* La distinción que importa: un intento rechazado que NO vino del iPhone no dice
+              nada sobre el Atajo. Sin esto, una prueba con un token falso se leía como "estás
+              perdiendo compras", que es la conclusión opuesta. */}
+          <p className={estado.atajo_sano === false ? "text-amber-700" : "text-slate-500"}>
+            {estado.atajo_sano === false
+              ? `${rechazados.length} intento(s) del Atajo no se guardaron — hay algo que revisar:`
+              : `${rechazados.length} intento(s) no se guardaron, ninguno del Atajo de tu iPhone (pruebas o llamadas de otro origen):`}
           </p>
           <ul className="mt-1 space-y-0.5 text-slate-500">
             {rechazados.slice(0, 5).map((g, i) => (
               <li key={i}>
                 {fmtHora(g.cuando)} · <b>{g.resultado.replace(/_/g, " ")}</b>
+                {g.desde ? ` · desde ${g.desde}` : ""}
                 {g.comercio ? ` · ${g.comercio}` : ""}
                 {g.detalle ? ` · ${g.detalle}` : ""}
               </li>
