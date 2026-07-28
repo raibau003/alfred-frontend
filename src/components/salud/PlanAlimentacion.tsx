@@ -18,8 +18,11 @@
 //    nutricionista para que exista. Un estado vacío sin salida es una pared.
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, RefreshCw, AlertTriangle, Salad, Moon, Flame } from "lucide-react";
-import { getPlanAlimentacion, type PlanAlimentacion as Plan, type FilaAlimentacion } from "@/lib/alfred/client";
+import { Loader2, RefreshCw, AlertTriangle, Salad, Moon, Flame, Check, MessageSquare } from "lucide-react";
+import {
+  getPlanAlimentacion, elegirVersionMenu,
+  type PlanAlimentacion as Plan, type FilaAlimentacion, type VersionMenu,
+} from "@/lib/alfred/client";
 
 const NOMBRE_COMIDA: Record<string, string> = {
   desayuno: "Desayuno", snack_am: "Media mañana", almuerzo: "Almuerzo",
@@ -29,6 +32,8 @@ const NOMBRE_COMIDA: Record<string, string> = {
 export function PlanAlimentacion({ onHablar }: { onHablar?: () => void }) {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [cargando, setCargando] = useState(true);
+  const [eligiendo, setEligiendo] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
 
   const cargar = useCallback(async (spinner = true) => {
     if (spinner) setCargando(true);
@@ -37,6 +42,16 @@ export function PlanAlimentacion({ onHablar }: { onHablar?: () => void }) {
   }, []);
 
   useEffect(() => { void cargar(); }, [cargar]);
+
+  const elegir = async (v: VersionMenu) => {
+    setEligiendo(v.id);
+    setAviso(null);
+    const r = await elegirVersionMenu(v.id);
+    setEligiendo(null);
+    if (r.error) { setAviso({ tipo: "error", texto: r.error }); return; }
+    await cargar(false);
+    if (r.mensaje) setAviso({ tipo: "ok", texto: r.mensaje });
+  };
 
   if (cargando) {
     return (
@@ -57,6 +72,9 @@ export function PlanAlimentacion({ onHablar }: { onHablar?: () => void }) {
             <Salad className="h-4 w-4" /> Alimentación de la semana
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
+            {p.alternativas.find(v => v.elegido)
+              ? <>Usás <strong className="text-slate-700">{p.alternativas.find(v => v.elegido)!.nombre}</strong>. </>
+              : null}
             {p.pauta
               ? <>Tu pauta es de <strong className="text-slate-700">{p.pauta.kcal_objetivo} kcal/día</strong>. El menú se arma sobre eso.</>
               : "Todavía no hay una pauta calculada."}
@@ -74,7 +92,48 @@ export function PlanAlimentacion({ onHablar }: { onHablar?: () => void }) {
       {p.error && (
         <Banda tipo="error">No pude leer tu menú ({p.error}). Probá actualizar.</Banda>
       )}
+      {aviso && <Banda tipo={aviso.tipo === "ok" ? "ok" : "error"}>{aviso.texto}</Banda>}
       {p.aviso && !p.error && <Banda tipo="alerta">{p.aviso}</Banda>}
+
+      {/* De dónde viene el menú, igual que en Deporte. Sin esto la tabla aparecía sin
+          historia: no se sabía qué versión se estaba mirando ni había forma de volver a la
+          anterior si el nutricionista cambiaba algo que no gustó. */}
+      {p.alternativas.length > 0 && (
+        <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {p.alternativas.map((v, i) => (
+            <button
+              key={v.id}
+              onClick={() => !v.elegido && void elegir(v)}
+              disabled={v.elegido || eligiendo !== null}
+              className={`rounded-xl border p-3 text-left transition-colors ${
+                v.elegido
+                  ? "border-slate-800 bg-white"
+                  : "border-slate-200 bg-white hover:border-slate-400 disabled:opacity-60"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-xs font-medium text-slate-800">Menú {i + 1}</span>
+                <span className="flex shrink-0 items-center gap-1">
+                  <span className="flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+                    <MessageSquare className="h-2.5 w-2.5" /> del chat
+                  </span>
+                  {v.elegido && (
+                    <span className="flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                      <Check className="h-2.5 w-2.5" /> En uso
+                    </span>
+                  )}
+                  {eligiendo === v.id && <Loader2 className="h-3 w-3 animate-spin text-slate-400" />}
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-slate-600">{v.nombre}</p>
+              <p className="mt-1 text-[11px] text-slate-400">
+                {v.dias_definidos} día{v.dias_definidos === 1 ? "" : "s"} · {v.comidas} comidas
+                {v.kcal_dia ? ` · ~${v.kcal_dia} kcal/día` : ""}
+              </p>
+            </button>
+          ))}
+        </div>
+      )}
 
       {p.pauta && (
         <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3">
@@ -194,10 +253,12 @@ function TablaSemana({ filas }: { filas: FilaAlimentacion[] }) {
   );
 }
 
-function Banda({ tipo, children }: { tipo: "error" | "alerta"; children: React.ReactNode }) {
-  const estilo = tipo === "error"
-    ? "border-red-200 bg-red-50 text-red-800"
-    : "border-amber-200 bg-amber-50 text-amber-800";
+function Banda({ tipo, children }: { tipo: "error" | "alerta" | "ok"; children: React.ReactNode }) {
+  const estilo = {
+    error: "border-red-200 bg-red-50 text-red-800",
+    alerta: "border-amber-200 bg-amber-50 text-amber-800",
+    ok: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  }[tipo];
   return (
     <div className={`mb-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${estilo}`}>
       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />

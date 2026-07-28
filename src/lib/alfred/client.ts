@@ -1185,8 +1185,20 @@ export type FilaAlimentacion = {
   kcal_dia: number | null;
 };
 
+export type VersionMenu = {
+  id: string;
+  nombre: string;
+  origen: string;
+  elegido: boolean;
+  creado_en: string;
+  dias_definidos: number;
+  kcal_dia: number | null;
+  comidas: number;
+};
+
 export type PlanAlimentacion = {
   tabla: FilaAlimentacion[];
+  alternativas: VersionMenu[];
   pauta: {
     kcal_objetivo: number; proteina_g: number; carbo_g: number; grasa_g: number;
     objetivo: string; explicacion: string;
@@ -1202,7 +1214,7 @@ export type PlanAlimentacion = {
 };
 
 const SIN_MENU: PlanAlimentacion = {
-  tabla: [], pauta: null, dias_definidos: 0, aviso: null,
+  tabla: [], alternativas: [], pauta: null, dias_definidos: 0, aviso: null,
   perfil: { objetivo: null, comidas: null, restricciones: null, no_come: null,
             horarios: null, comidas_fuera: null, alcohol: null, dia_libre: null },
 };
@@ -1217,6 +1229,21 @@ export async function getPlanAlimentacion(): Promise<PlanAlimentacion> {
     // Mismo criterio que en entrenamiento: "no pude preguntar" y "no tenés menú" se ven
     // igual en pantalla, y solo el primero se arregla reintentando.
     return { ...SIN_MENU, error: String(e) };
+  }
+}
+
+export async function elegirVersionMenu(id: string): Promise<{ ok?: boolean; nombre?: string; mensaje?: string; error?: string }> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/nutricion/elegir`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      body: JSON.stringify({ id }),
+    });
+    const j = await r.json();
+    return r.ok ? j : { error: j?.error ?? `el router respondió ${r.status}` };
+  } catch (e) {
+    return { error: String(e) };
   }
 }
 
