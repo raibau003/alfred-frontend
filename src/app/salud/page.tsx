@@ -26,8 +26,14 @@ type Tab = typeof TABS[number]["k"];
 
 export default function SaludPage() {
   const { user } = useAuth();
-  const alfred = useAlfred();
+  // DOS conversaciones separadas, una por asesor. Compartían una sola: al abrir Nutrición
+  // aparecía todo lo hablado con el coach —planes de entrenamiento incluidos— y el
+  // nutricionista parecía estar contestando cosas de deporte. Son dos asesores distintos y
+  // cada uno tiene que tener su propio hilo.
+  const coach = useAlfred();
+  const nutricionista = useAlfred();
   const [tab, setTab] = useState<Tab>("deporte");
+  const alfred = tab === "nutricion" ? nutricionista : coach;
 
   const esChat = tab === "deporte" || tab === "nutricion";
 
