@@ -20,7 +20,22 @@ echo "🤖 Instalando Alfred PC Bridge..."
 mkdir -p "$INSTALL_DIR"
 
 # Download bridge script
-curl -fsSL "https://alfred-frontend-vercel.vercel.app/alfred-bridge.py" -o "$INSTALL_DIR/alfred-bridge.py"
+# El bridge se baja del ROUTER, no de este repo.
+#
+# Hasta el 2026-07-28 se servia desde public/alfred-bridge.py de aca, y el mismo
+# archivo vivia tambien en alfred-railway/pc-bridge/. Dos copias, dos repos, nada
+# que las sincronizara: la del front quedo en la del 19 de julio (243 lineas, 8
+# de las 18 acciones, sin los alias open_url/type) y esa es la que se instalo en
+# la Mac. O sea que el arreglo del carro del super nunca llego a la maquina.
+#
+# El cliente sale del mismo deploy que el servidor con el que habla.
+BRIDGE_URL="${ALFRED_BRIDGE_URL:-https://alfred-router-prod-production.up.railway.app/bridge/script}"
+if ! curl -fsSL "$BRIDGE_URL" -o "$INSTALL_DIR/alfred-bridge.py"; then
+  echo "No pude bajar el bridge desde $BRIDGE_URL"
+  echo "Revisa que el router este arriba y volve a intentar."
+  exit 1
+fi
+echo "Bridge instalado: $(grep -m1 '^BRIDGE_VERSION' "$INSTALL_DIR/alfred-bridge.py" || echo 'version desconocida')"
 
 # Install Python dependencies
 echo "📦 Instalando dependencias..."

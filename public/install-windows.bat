@@ -19,7 +19,7 @@ REM Create directory
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 
 REM Download bridge script
-powershell -Command "Invoke-WebRequest -Uri 'https://alfred-frontend-vercel.vercel.app/alfred-bridge.py' -OutFile '%INSTALL_DIR%\alfred-bridge.py'"
+powershell -Command "Invoke-WebRequest -Uri 'https://alfred-router-prod-production.up.railway.app/bridge/script' -OutFile '%INSTALL_DIR%\alfred-bridge.py'"
 
 REM Check if Python is installed
 python --version >nul 2>&1
