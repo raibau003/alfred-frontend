@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { ChatView } from "@/components/chat/ChatView";
 import { HogarPanel } from "@/components/salud/HogarPanel";
 import { PlanEntrenamiento } from "@/components/salud/PlanEntrenamiento";
+import { PlanAlimentacion } from "@/components/salud/PlanAlimentacion";
 import { Dumbbell, Salad, Users, Table2 } from "lucide-react";
 
 // El orden de las pestañas NO es decorativo: el coach va primero porque define el gasto
@@ -24,6 +25,20 @@ const TABS = [
 
 type Tab = typeof TABS[number]["k"];
 
+// Dentro de "La semana" conviven las dos mitades del plan. Pedido de Javier: "que lo que
+// hace la nutricionista quede también en la semana, con una pestaña de deporte y otra de
+// alimentación, así puedo ver qué tengo que comer".
+//
+// Van como sub-pestañas y no como dos pestañas más arriba porque son la MISMA pregunta
+// —qué me toca esta semana— vista de dos lados. Arriba, "Deporte" y "Nutrición" son los
+// dos chats; acá abajo, las dos tablas.
+const VISTAS = [
+  { k: "entrenamiento", t: "Deporte", icon: Dumbbell },
+  { k: "alimentacion", t: "Alimentación", icon: Salad },
+] as const;
+
+type Vista = typeof VISTAS[number]["k"];
+
 export default function SaludPage() {
   const { user } = useAuth();
   // DOS conversaciones separadas, una por asesor. Compartían una sola: al abrir Nutrición
@@ -35,6 +50,7 @@ export default function SaludPage() {
   const coach = useAlfred(undefined, "salud-coach");
   const nutricionista = useAlfred(undefined, "salud-nutricion");
   const [tab, setTab] = useState<Tab>("deporte");
+  const [vista, setVista] = useState<Vista>("entrenamiento");
   const alfred = tab === "nutricion" ? nutricionista : coach;
 
   const esChat = tab === "deporte" || tab === "nutricion";
@@ -59,7 +75,28 @@ export default function SaludPage() {
 
       {!esChat ? (
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {tab === "plan" ? <PlanEntrenamiento /> : <HogarPanel />}
+          {tab === "plan" ? (
+            <>
+              <div className="flex items-center gap-1 border-b border-slate-100 bg-slate-50 px-4 py-2">
+                {VISTAS.map(({ k, t, icon: Icon }) => (
+                  <button
+                    key={k}
+                    onClick={() => setVista(k)}
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-medium transition-colors ${
+                      vista === k ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:bg-white/60"
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" /> {t}
+                  </button>
+                ))}
+              </div>
+              {vista === "entrenamiento"
+                ? <PlanEntrenamiento />
+                : <PlanAlimentacion onHablar={() => setTab("nutricion")} />}
+            </>
+          ) : (
+            <HogarPanel />
+          )}
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
