@@ -18,9 +18,11 @@
 //    nutricionista para que exista. Un estado vacío sin salida es una pared.
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, RefreshCw, AlertTriangle, Salad, Moon, Flame, Check, MessageSquare } from "lucide-react";
 import {
-  getPlanAlimentacion, elegirVersionMenu,
+  Loader2, RefreshCw, AlertTriangle, Salad, Moon, Flame, Check, MessageSquare, ShoppingCart,
+} from "lucide-react";
+import {
+  getPlanAlimentacion, elegirVersionMenu, agregarComprasDelMenu,
   type PlanAlimentacion as Plan, type FilaAlimentacion, type VersionMenu,
 } from "@/lib/alfred/client";
 
@@ -33,6 +35,7 @@ export function PlanAlimentacion({ onHablar }: { onHablar?: () => void }) {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [cargando, setCargando] = useState(true);
   const [eligiendo, setEligiendo] = useState<string | null>(null);
+  const [agregando, setAgregando] = useState(false);
   const [aviso, setAviso] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
 
   const cargar = useCallback(async (spinner = true) => {
@@ -167,7 +170,22 @@ export function PlanAlimentacion({ onHablar }: { onHablar?: () => void }) {
           )}
         </div>
       ) : (
-        <TablaSemana filas={p.tabla} />
+        <>
+          <TablaSemana filas={p.tabla} />
+          <ListaCompras
+            compras={p.compras}
+            agregando={agregando}
+            onAgregar={async () => {
+              setAgregando(true);
+              setAviso(null);
+              const r = await agregarComprasDelMenu();
+              setAgregando(false);
+              setAviso(r.error
+                ? { tipo: "error", texto: r.error }
+                : { tipo: "ok", texto: r.mensaje ?? "Lo agregué a tu lista de compras." });
+            }}
+          />
+        </>
       )}
 
       {(p.perfil.restricciones || p.perfil.no_come || p.perfil.horarios) && (
@@ -249,6 +267,62 @@ function TablaSemana({ filas }: { filas: FilaAlimentacion[] }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// La lista de compras del menú, debajo de la tabla. Pedido de Javier, y es literal: un
+// plan que no dice qué comprar no se puede cumplir — la semana se cae el martes, cuando
+// falta el pollo.
+//
+// Se muestra CON las cantidades ya sumadas entre días ("pollo 350 g", no "pollo" tres
+// veces): en la góndola lo que se necesita saber es cuánto, no qué.
+function ListaCompras({
+  compras, agregando, onAgregar,
+}: {
+  compras: Plan["compras"];
+  agregando: boolean;
+  onAgregar: () => void;
+}) {
+  if (!compras?.cuantos) return null;
+  return (
+    <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+          <ShoppingCart className="h-4 w-4" /> Qué comprar para esta semana
+          <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-normal text-slate-500">
+            {compras.cuantos} productos
+          </span>
+        </h3>
+        <button
+          onClick={onAgregar}
+          disabled={agregando}
+          className="flex items-center gap-1.5 rounded-lg bg-[#0a1628] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#16233a] disabled:opacity-60"
+        >
+          {agregando ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShoppingCart className="h-3 w-3" />}
+          Agregar a mi lista
+        </button>
+      </div>
+
+      <ul className="grid gap-x-6 gap-y-1 text-xs text-slate-700 sm:grid-cols-2 lg:grid-cols-3">
+        {compras.productos.map((x, i) => (
+          <li key={i} className="flex items-baseline justify-between gap-2 border-b border-slate-50 py-0.5">
+            <span className="capitalize">{x.producto}</span>
+            {x.cantidad != null
+              ? <span className="shrink-0 tabular-nums text-slate-500">{x.cantidad} {x.unidad}</span>
+              : <span className="shrink-0 text-slate-300">a ojo</span>}
+          </li>
+        ))}
+      </ul>
+
+      {compras.sin_cantidad.length > 0 && (
+        // No se inventa una cantidad: se dice cuáles faltan. Un número inventado en una
+        // lista de compras se compra igual.
+        <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
+          Sin cantidad en el menú: {compras.sin_cantidad.join(", ")}. Si le pedís al
+          nutricionista que las precise, la próxima lista sale completa.
+        </p>
+      )}
     </div>
   );
 }
