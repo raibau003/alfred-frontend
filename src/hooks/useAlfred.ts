@@ -76,9 +76,17 @@ export function useAlfred(threadId?: string, chatKey?: string) {
       chatKey ? `web:${chatKey}:${user?.email ?? "user"}` : undefined);
     if (sesion) {
       sessionRef.current = sesion.id;
-      // El router hereda las últimas vueltas del chat para tener contexto. Ya están en
-      // pantalla: se cuentan como pintadas o el primer poll las duplica.
-      pintadosRef.current = sesion.heredados;
+      // Línea base: lo que la sesión YA trae (el router hereda las últimas vueltas del chat
+      // para darle contexto al agente). Se mide leyendo la MISMA lista que después recorre
+      // el poll: `getMessages` descarta los mensajes sin texto, así que es más corta que el
+      // conteo crudo del router. Usar ese conteo dejaba el puntero pasado del final y la
+      // pantalla no mostraba NADA — ni la respuesta ni el progreso.
+      try {
+        const yaHay = await getMessages(sesion.id);
+        pintadosRef.current = yaHay.messages.length;
+      } catch {
+        pintadosRef.current = 0;
+      }
       setConnected(true);
     }
   }, [user, chatKey]);
