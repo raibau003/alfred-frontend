@@ -19,7 +19,9 @@ import {
   Wallet,
   ShoppingCart,
   HeartPulse,
-} from "lucide-react";
+  GraduationCap,
+  Zap,
+  LineChart} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ROUTER_URL } from "@/lib/alfred/client";
@@ -31,7 +33,15 @@ const navItems = [
   { href: "/misiones", label: "Misiones", icon: Target },
   { href: "/finanzas", label: "Finanzas", icon: Wallet },
   { href: "/salud", label: "Salud", icon: HeartPulse },
+  { href: "/educacion", label: "Educación", icon: GraduationCap },
+  // Seguimiento va pegado a Educación: es la misma pregunta —cómo va cada uno— pero
+  // resuelta por persona en vez de por calendario.
+  { href: "/seguimiento", label: "Seguimiento", icon: LineChart },
   { href: "/shopping", label: "Compras", icon: ShoppingCart },
+  // Automatizaciones va junto a Agentes y no al final: las dos responden a "qué hace Alfred
+  // por su cuenta", y quien va a pausar una regla busca en el mismo lugar donde pausa un
+  // agente.
+  { href: "/automatizaciones", label: "Automatizaciones", icon: Zap },
   { href: "/connectors", label: "Integraciones", icon: Plug },
   { href: "/agents", label: "Agentes", icon: Bot },
   { href: "/tester", label: "Tester", icon: FlaskConical },

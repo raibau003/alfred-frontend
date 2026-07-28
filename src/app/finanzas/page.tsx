@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   Wallet, TrendingUp, AlertTriangle, RefreshCw, Loader2, Download, Repeat, CreditCard,
-  Layers, Landmark, ArrowDownRight, ArrowUpRight, PiggyBank, X, Search,
+  Layers, Landmark, ArrowDownRight, ArrowUpRight, PiggyBank, X, Search, Check, ChevronDown,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine, Cell, PieChart, Pie, Legend,
@@ -19,6 +19,15 @@ const clpShort = (n: number) => {
 };
 const MES_NOM = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const mesLabel = (k: string) => { const [y, m] = (k || "").split("-"); return `${MES_NOM[Number(m) - 1] ?? m} ${y ?? ""}`.trim(); };
+// Cómo se nombra la selección de meses. Con un mes elegido dice el mes; con varios dice
+// cuántos y desde/hasta, para que ningún total quede sin decir a qué período corresponde.
+const rangoLabel = (sel: string[], total: number) => {
+  if (!sel.length) return "sin meses";
+  if (sel.length === 1) return mesLabel(sel[0]);
+  const s = [...sel].sort();
+  if (sel.length === total) return `los ${total} meses`;
+  return `${sel.length} meses (${mesLabel(s[0])} – ${mesLabel(s[s.length - 1])})`;
+};
 
 type Cat = { categoria: string; monto: number };
 type Mov = { mes: string; fecha: string; comercio: string; monto: number; tipo: string; categoria: string; producto: string; banco: string; fuente?: string; titular?: string | null };
@@ -28,6 +37,10 @@ type MesData = {
   tarjeta: { gasto: number };
   ingresos: number; egresos: number; neto: number;
   categorias: Cat[]; categoriasTarjeta: Cat[];
+  // true = el mes no tiene NINGÚN movimiento de cuenta corriente, o sea que la cartola no se
+  // ha cargado. Los totales entonces son desconocidos, no cero.
+  faltaCartola?: boolean;
+  movsCC?: number; movsTarjeta?: number;
 };
 type Dash = {
   config: { presupuesto: number; moneda: string };
@@ -48,24 +61,62 @@ const PIE = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "
 const TABS = ["Resumen", "Personas", "Tarjetas", "Cuentas", "Categorías", "Evolución", "Proyección"] as const;
 type Tab = typeof TABS[number];
 
+// Estado del Atajo del celular. Los "golpes" son los intentos que llegaron al router desde el
+// último arranque: sirven para distinguir "el Atajo no disparó" de "disparó y algo lo rechazó".
+interface AtajoEstado {
+  titulares_configurados?: string[];
+  guardados_hoy?: number;
+  arrancado?: string;
+  golpes?: { cuando: string; resultado: string; titular?: string; monto?: number | null; comercio?: string | null; detalle?: string | null; desde?: string }[];
+  atajo_sano?: boolean;
+  ultimos_guardados?: { fecha: string; titular: string; comercio: string; monto: number; created_at: string }[];
+  error?: string;
+}
+
 export default function FinanzasPage() {
   const [d, setD] = useState<Dash | null>(null);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
-  const [mes, setMes] = useState<string>("");
+  // Meses ELEGIDOS (uno o varios). Todo lo que se ve abajo —KPIs, categorías, personas y
+  // detalle línea a línea— se calcula sobre esta selección: si está julio se ve julio, y si
+  // se agregan meses se ve la suma de esos meses. Antes el selector era de un mes solo y el
+  // detalle de categorías ignoraba el mes elegido (decía "todos los meses"), así que la
+  // pantalla mostraba dos períodos distintos a la vez sin avisarlo.
+  const [meses, setMeses] = useState<string[]>([]);
   const [tab, setTab] = useState<Tab>("Resumen");
   const [catSel, setCatSel] = useState<string>("");
   const [movQuery, setMovQuery] = useState<string>("");
   const [movTitular, setMovTitular] = useState<string>("");
+  const [fallo, setFallo] = useState<string | null>(null);
+  const [atajo, setAtajo] = useState<AtajoEstado | null>(null);
 
   const load = useCallback(async () => {
+    // El `catch {}` que había acá hacía que un router caído se viera EXACTAMENTE igual que
+    // "no tenés gastos": la pestaña Personas decía "Sin gastos por persona todavía" mientras
+    // los dos gastos del día estaban guardados y el endpoint los devolvía bien. Un error de
+    // lectura se dice; si no, se toman decisiones sobre datos que no se leyeron.
     try {
       const r = await fetch("/api/finance/dashboard", { cache: "no-store" });
       const j = await r.json();
-      if (!j.error) { setD(j); setMes((prev) => prev || j.mesReferencia || (j.meses?.[j.meses.length - 1] ?? "")); }
-    } catch {} finally { setLoading(false); }
+      if (j.error) { setFallo(String(j.error)); return; }
+      setFallo(null);
+      setD(j);
+      setMeses((prev) => (prev.length ? prev : [j.mesReferencia || (j.meses?.[j.meses.length - 1] ?? "")].filter(Boolean)));
+    } catch (e) {
+      setFallo((e as Error).message || "no pude conectarme");
+    } finally { setLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  // Se pide solo al abrir Personas: es la única vista que lo muestra y no tiene sentido
+  // pagar la llamada en las otras cinco pestañas.
+  useEffect(() => {
+    if (tab !== "Personas") return;
+    fetch("/api/finance/wallet-estado", { cache: "no-store" })
+      .then((r) => r.json())
+      .then(setAtajo)
+      .catch((e) => setAtajo({ error: (e as Error).message }));
+  }, [tab]);
 
   const importar = async () => {
     setImporting(true);
@@ -73,27 +124,42 @@ export default function FinanzasPage() {
     setTimeout(() => { setImporting(false); load(); }, 5000);
   };
 
-  const pm = d?.porMes?.[mes];
+  // Un solo mes → ese mes tal cual; varios → la suma. Se agrega acá y no en el router para
+  // que cambiar la selección no cueste una llamada: el dashboard ya trae todos los meses.
+  const pm = useMemo(() => aggMeses(d, meses), [d, meses]);
   const presupuesto = d?.config.presupuesto ?? 6000000;
-  const movsMes = useMemo(() => (d?.movimientos ?? []).filter((m) => m.mes === mes), [d, mes]);
-  // TODOS los movimientos de la categoría seleccionada (todos los meses, cuenta + tarjeta).
-  const movsCat = useMemo(() => (d?.movimientos ?? []).filter((m) => m.categoria === catSel && m.tipo === "cargo"), [d, catSel]);
-  // Totales por categoría sobre TODOS los meses (cuenta + tarjeta) → barras coherentes con el detalle.
-  const catsAll = useMemo(() => {
-    const acc: Record<string, number> = {};
-    for (const t of (d?.movimientos ?? [])) { if (t.tipo !== "cargo") continue; const c = t.categoria || "Otros"; acc[c] = (acc[c] || 0) + t.monto; }
-    return Object.entries(acc).map(([categoria, monto]) => ({ categoria, monto })).sort((a, b) => b.monto - a.monto);
-  }, [d]);
+  // El tope de tarjeta es MENSUAL: comparar 3 meses de gasto contra un mes de tope diría que
+  // te pasaste cuando no. Con varios meses elegidos el tope se multiplica.
+  const topeRango = presupuesto * Math.max(1, meses.length);
+  const rango = rangoLabel(meses, d?.meses?.length ?? 0);
+  const mesesSet = useMemo(() => new Set(meses), [meses]);
+  // Movimientos del período elegido: la base de las pestañas Cuentas, Categorías y Personas.
+  const movsSel = useMemo(() => (d?.movimientos ?? []).filter((m) => mesesSet.has(m.mes)), [d, mesesSet]);
+  // Meses elegidos que todavía no tienen cartola de cuenta corriente: sus ingresos/egresos
+  // son desconocidos, no cero, y eso cambia cómo hay que leer los totales de arriba.
+  const mesesSinCartola = useMemo(() => meses.filter((m) => d?.porMes?.[m]?.faltaCartola).sort(), [d, meses]);
+  // Movimientos de la categoría elegida, dentro del período elegido (cuenta + tarjeta).
+  const movsCat = useMemo(() => movsSel.filter((m) => m.categoria === catSel && m.tipo === "cargo"), [movsSel, catSel]);
+  // Totales por categoría del período (cuenta + tarjeta) → barras coherentes con el detalle.
+  const catsAll = useMemo(() => catsDeMovs(movsSel), [movsSel]);
   // Vista de movimientos: si hay búsqueda → TODAS las categorías; si no → la categoría seleccionada.
   // Filtro por persona: "Javier" = sus wallet + los de cartola (cuentas propias, titular vacío); "Emi" = solo wallet de Emi.
   const movsFiltered = useMemo(() => {
     const q = movQuery.trim().toLowerCase();
-    let base = q ? (d?.movimientos ?? []).filter((m) => m.tipo === "cargo") : (catSel ? movsCat : []);
-    if (q) base = base.filter((m) => (m.comercio || "").toLowerCase().includes(q) || (m.categoria || "").toLowerCase().includes(q) || (m.banco || "").toLowerCase().includes(q));
+    let base = q ? movsSel.filter((m) => m.tipo === "cargo") : (catSel ? movsCat : []);
+    if (q) base = base.filter((m) => coincide(m, q));
     if (movTitular === "Emi") base = base.filter((m) => m.titular === "Emi");
     else if (movTitular === "Javier") base = base.filter((m) => m.titular === "Javier" || !m.titular);
     return base;
-  }, [d, movQuery, catSel, movsCat, movTitular]);
+  }, [movsSel, movQuery, catSel, movsCat, movTitular]);
+  // Cuántos resultados quedaron FUERA del período elegido. Sin este número, buscar "Netflix"
+  // en un mes sin compras se lee como "nunca pagué Netflix", que es lo contrario de la verdad.
+  const fueraDelRango = useMemo(() => {
+    const q = movQuery.trim().toLowerCase();
+    if (!q) return 0;
+    return (d?.movimientos ?? []).filter((m) => m.tipo === "cargo" && !mesesSet.has(m.mes) && coincide(m, q)
+      && (movTitular === "Emi" ? m.titular === "Emi" : movTitular === "Javier" ? (m.titular === "Javier" || !m.titular) : true)).length;
+  }, [d, movQuery, mesesSet, movTitular]);
 
   if (loading) return <div className="flex h-64 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-slate-300" /></div>;
 
@@ -109,10 +175,7 @@ export default function FinanzasPage() {
           <p className="text-sm text-slate-500">Santander + BICE · {d?.totalMovimientos ?? 0} movimientos · {d?.meses?.length ?? 0} meses</p>
         </div>
         {(d?.meses?.length ?? 0) > 0 && (
-          <select value={mes} onChange={(e) => setMes(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700">
-            {[...(d?.meses ?? [])].reverse().map((m) => <option key={m} value={m}>{mesLabel(m)}</option>)}
-          </select>
+          <MesPicker meses={d!.meses} sel={meses} onChange={setMeses} porMes={d!.porMes} />
         )}
         <button onClick={load} className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-100"><RefreshCw className="h-3.5 w-3.5" /> Actualizar</button>
         <button onClick={importar} disabled={importing} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
@@ -120,7 +183,17 @@ export default function FinanzasPage() {
         </button>
       </div>
 
-      {sinDatos && (
+      {fallo && (
+        <div className="mb-5 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            No pude leer tus finanzas ({fallo}). Lo que ves abajo puede estar viejo o incompleto.{" "}
+            <button onClick={load} className="underline">Reintentar</button>
+          </span>
+        </div>
+      )}
+
+      {!fallo && sinDatos && (
         <div className="mb-6 rounded-xl border border-dashed border-emerald-200 bg-emerald-50/50 p-5 text-center">
           <CreditCard className="mx-auto mb-2 h-9 w-9 text-emerald-500" />
           <p className="font-medium text-emerald-800">Aún no importé tus cartolas.</p>
@@ -128,13 +201,27 @@ export default function FinanzasPage() {
         </div>
       )}
 
+      {/* Sin cartola del mes, los totales de cuenta corriente no son cero: son desconocidos.
+          Mostrarlos como $0 hace pensar que los datos se perdieron — que es exactamente lo
+          que pasó con julio, que tenía la tarjeta cargada y la cartola no. */}
+      {mesesSinCartola.length > 0 && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            {mesesSinCartola.length === meses.length
+              ? `Todavía no tengo la cartola de cuenta corriente ${meses.length === 1 ? "de este mes" : "de ninguno de los meses elegidos"}, así que ingresos, egresos y neto están sin datos — no en cero. El gasto de tarjeta sí está al día.`
+              : `${mesesSinCartola.length} de los ${meses.length} meses elegidos ${mesesSinCartola.length === 1 ? "no tiene" : "no tienen"} cartola de cuenta corriente (${mesesSinCartola.map(mesLabel).join(", ")}): ingresos, egresos y neto son de los otros meses, no del total. El gasto de tarjeta sí está completo.`}
+          </span>
+        </div>
+      )}
+
       {/* KPIs del mes */}
       {pm && (
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Kpi icon={<ArrowUpRight className="h-4 w-4" />} label="Ingresos" value={clp(pm.ingresos)} color="text-emerald-600" />
-          <Kpi icon={<ArrowDownRight className="h-4 w-4" />} label="Egresos" value={clp(pm.egresos)} color="text-slate-700" />
-          <Kpi icon={<PiggyBank className="h-4 w-4" />} label="Neto" value={clp(pm.neto)} color={pm.neto < 0 ? "text-red-600" : "text-emerald-600"} />
-          <Kpi icon={<CreditCard className="h-4 w-4" />} label="Gasto tarjeta" value={clp(pm.tarjeta.gasto)} color={pm.tarjeta.gasto > presupuesto ? "text-red-600" : "text-indigo-600"} sub={`${Math.round(pm.tarjeta.gasto / presupuesto * 100)}% del tope`} />
+          <Kpi icon={<ArrowUpRight className="h-4 w-4" />} label="Ingresos" value={pm.faltaCartola ? "—" : clp(pm.ingresos)} color={pm.faltaCartola ? "text-slate-300" : "text-emerald-600"} sub={pm.faltaCartola ? "sin cartola" : undefined} />
+          <Kpi icon={<ArrowDownRight className="h-4 w-4" />} label="Egresos" value={pm.faltaCartola ? "—" : clp(pm.egresos)} color={pm.faltaCartola ? "text-slate-300" : "text-slate-700"} sub={pm.faltaCartola ? "sin cartola" : undefined} />
+          <Kpi icon={<PiggyBank className="h-4 w-4" />} label="Neto" value={pm.faltaCartola ? "—" : clp(pm.neto)} color={pm.faltaCartola ? "text-slate-300" : pm.neto < 0 ? "text-red-600" : "text-emerald-600"} sub={pm.faltaCartola ? "sin cartola" : undefined} />
+          <Kpi icon={<CreditCard className="h-4 w-4" />} label="Gasto tarjeta" value={clp(pm.tarjeta.gasto)} color={pm.tarjeta.gasto > topeRango ? "text-red-600" : "text-indigo-600"} sub={`${Math.round(pm.tarjeta.gasto / topeRango * 100)}% del tope${meses.length > 1 ? ` (${meses.length} meses)` : ""}`} />
         </div>
       )}
 
@@ -149,11 +236,11 @@ export default function FinanzasPage() {
       {/* ─── RESUMEN ─── */}
       {tab === "Resumen" && pm && (
         <div className="space-y-4">
-          <Card title="Flujo del mes">
+          <Card title={`Flujo · ${rango}`}>
             <div className="grid grid-cols-3 gap-3 text-center">
-              <Big label="Ingresos" value={clp(pm.ingresos)} color="text-emerald-600" />
-              <Big label="Egresos" value={clp(pm.egresos)} color="text-slate-700" />
-              <Big label="Resultado" value={clp(pm.neto)} color={pm.neto < 0 ? "text-red-600" : "text-emerald-600"} />
+              <Big label="Ingresos" value={pm.faltaCartola ? "—" : clp(pm.ingresos)} color={pm.faltaCartola ? "text-slate-300" : "text-emerald-600"} />
+              <Big label="Egresos" value={pm.faltaCartola ? "—" : clp(pm.egresos)} color={pm.faltaCartola ? "text-slate-300" : "text-slate-700"} />
+              <Big label="Resultado" value={pm.faltaCartola ? "—" : clp(pm.neto)} color={pm.faltaCartola ? "text-slate-300" : pm.neto < 0 ? "text-red-600" : "text-emerald-600"} />
             </div>
           </Card>
           <div className="grid gap-4 md:grid-cols-2">
@@ -174,14 +261,14 @@ export default function FinanzasPage() {
       {/* ─── TARJETAS ─── */}
       {tab === "Tarjetas" && (
         <div className="space-y-4">
-          <Card title={`Gasto de tarjeta · ${mesLabel(mes)}`}>
+          <Card title={`Gasto de tarjeta · ${rango}`}>
             <div className="mb-2 flex items-end justify-between">
               <p className="text-3xl font-bold text-slate-900">{clp(pm?.tarjeta.gasto ?? 0)}</p>
-              <p className="text-sm text-slate-500">Tope: {clp(presupuesto)}</p>
+              <p className="text-sm text-slate-500">Tope: {clp(topeRango)}{meses.length > 1 ? ` (${clp(presupuesto)} × ${meses.length} meses)` : ""}</p>
             </div>
-            <Bar100 value={pm?.tarjeta.gasto ?? 0} max={presupuesto} />
-            {(pm?.tarjeta.gasto ?? 0) > presupuesto && (
-              <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"><AlertTriangle className="h-4 w-4" /> Superaste el tope en {clp((pm?.tarjeta.gasto ?? 0) - presupuesto)}.</p>
+            <Bar100 value={pm?.tarjeta.gasto ?? 0} max={topeRango} />
+            {(pm?.tarjeta.gasto ?? 0) > topeRango && (
+              <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"><AlertTriangle className="h-4 w-4" /> Superaste el tope en {clp((pm?.tarjeta.gasto ?? 0) - topeRango)}.</p>
             )}
           </Card>
           <Card title="Gasto de tarjeta · 12 meses">
@@ -210,7 +297,7 @@ export default function FinanzasPage() {
               )}
             </Card>
           </div>
-          <Card title="Tarjeta · por categoría (este mes)"><CatBars cats={pm?.categoriasTarjeta ?? []} /></Card>
+          <Card title={`Tarjeta · por categoría · ${rango}`}><CatBars cats={pm?.categoriasTarjeta ?? []} /></Card>
         </div>
       )}
 
@@ -221,8 +308,8 @@ export default function FinanzasPage() {
             <AccountCard name="Santander · Cuenta corriente" bank={pm.santanderCC} />
             <AccountCard name="BICE · Cuenta corriente" bank={pm.biceCC} />
           </div>
-          <Card title={`Movimientos · ${mesLabel(mes)}`}>
-            <MovTable movs={movsMes.filter((m) => m.producto === "cuenta_corriente")} />
+          <Card title={`Movimientos · ${rango}`}>
+            <MovTable movs={movsSel.filter((m) => m.producto === "cuenta_corriente")} />
           </Card>
         </div>
       )}
@@ -231,8 +318,10 @@ export default function FinanzasPage() {
       {tab === "Categorías" && pm && (
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <Card title="Egresos cuenta corriente"><CatPie cats={pm.categorias} /></Card>
-            <Card title="Gasto tarjeta"><CatPie cats={pm.categoriasTarjeta} /></Card>
+            {/* Las tortas son el punto de entrada: tocar una porción abre esa categoría y el
+                detalle línea a línea aparece abajo, sin tener que buscarla en la lista. */}
+            <Card title={`Egresos cuenta corriente · ${rango}`}><CatPie cats={pm.categorias} onSelect={setCatSel} selected={catSel} /></Card>
+            <Card title={`Gasto tarjeta · ${rango}`}><CatPie cats={pm.categoriasTarjeta} onSelect={setCatSel} selected={catSel} /></Card>
           </div>
 
           {/* Buscador global + filtro por persona */}
@@ -242,7 +331,7 @@ export default function FinanzasPage() {
               <input
                 value={movQuery}
                 onChange={(e) => setMovQuery(e.target.value)}
-                placeholder="Buscar comercio en TODOS los gastos (ej: Uber, Netflix, farmacia)…"
+                placeholder={`Buscar comercio en ${rango} (ej: Uber, Netflix, farmacia)…`}
                 className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-8 text-sm outline-none focus:border-indigo-400"
               />
               {movQuery && (
@@ -257,15 +346,23 @@ export default function FinanzasPage() {
           </div>
 
           {!movQuery && (
-            <Card title="Detalle egresos (cuenta + tarjeta) · todos los meses · tocá una categoría">
+            <Card title={`Detalle egresos (cuenta + tarjeta) · ${rango} · tocá una categoría`}>
               <CatBars cats={catsAll} onSelect={setCatSel} selected={catSel} />
             </Card>
           )}
 
           {(movQuery || catSel) && (
-            <Card title={movQuery ? `Resultados · “${movQuery}”` : `Detalle · ${catSel} · todos los meses`}>
-              {!movQuery && <p className="mb-2 -mt-1 text-xs text-slate-400">Todos los gastos de esta categoría (cuenta corriente + tarjeta), del más grande al más chico.</p>}
-              {movQuery && movsFiltered.length === 0 && <p className="mb-1 text-xs text-slate-400">Sin resultados para “{movQuery}”{movTitular ? ` de ${movTitular}` : ""}.</p>}
+            <Card title={movQuery ? `Resultados · “${movQuery}” · ${rango}` : `Detalle · ${catSel} · ${rango}`}>
+              {!movQuery && <p className="mb-2 -mt-1 text-xs text-slate-400">Todos los gastos de esta categoría (cuenta corriente + tarjeta) en {rango}, del más grande al más chico.</p>}
+              {movQuery && movsFiltered.length === 0 && <p className="mb-1 text-xs text-slate-400">Sin resultados para “{movQuery}”{movTitular ? ` de ${movTitular}` : ""} en {rango}.</p>}
+              {/* Lo que quedó afuera se dice y se puede traer de un toque: un cero acá sin esta
+                  línea se lee como "nunca gastaste en eso" cuando solo es el mes elegido. */}
+              {movQuery && fueraDelRango > 0 && (
+                <p className="mb-2 text-xs text-slate-500">
+                  Hay {fueraDelRango} resultado(s) más en otros meses.{" "}
+                  <button onClick={() => setMeses([...(d?.meses ?? [])])} className="font-medium text-indigo-600 underline">Buscar en todos los meses</button>
+                </p>
+              )}
               <MovTable movs={movsFiltered} showCat={!!movQuery || !catSel} />
             </Card>
           )}
@@ -281,36 +378,21 @@ export default function FinanzasPage() {
         </div>
       )}
 
-      {/* ─── PERSONAS (quién gasta qué, real-time) ─── */}
+      {/* ─── PERSONAS (quién gasta qué, con drill-down por categoría) ─── */}
       {tab === "Personas" && (
         <div className="space-y-4">
-          <p className="text-xs text-slate-400">Gastos en tiempo real por persona (notificaciones del banco vía Wallet).{d!.mesActual ? ` Mes actual: ${d!.mesActual}.` : ""}</p>
-          {(!d!.porTitular || d!.porTitular.length === 0) ? (
-            <Card title="Sin gastos por persona todavía">
-              <p className="text-sm text-slate-500">Cuando lleguen notificaciones del banco (Javier/Emi) vía el Atajo de Wallet, vas a ver acá <b>quién gasta en qué</b>, categorizado y al día.</p>
+          <EstadoAtajo estado={atajo} />
+          {fallo ? (
+            // "No pude preguntar" y "no hay gastos" son cosas distintas y se ven iguales si no
+            // se dicen. Esta pestaña llegó a mostrar "sin gastos" con dos compras guardadas.
+            <Card title="No pude leer los gastos">
+              <p className="text-sm text-slate-500">
+                El router no respondió ({fallo}). Los gastos que hayan llegado por el Atajo siguen guardados: es la
+                lectura la que falló. <button onClick={load} className="underline">Reintentar</button>
+              </p>
             </Card>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {d!.porTitular.map((p) => (
-                <Card key={p.titular} title={`${p.titular === "Emi" ? "👩" : "🧑"} ${p.titular}`}>
-                  <div className="mb-3 flex items-end justify-between">
-                    <div><p className="text-[11px] text-slate-400">Este mes</p><p className="text-2xl font-bold text-slate-900">{clp(p.esteMes)}</p></div>
-                    <div className="text-right"><p className="text-[11px] text-slate-400">Total · {p.count} mov.</p><p className="text-sm font-medium text-slate-500">{clp(p.total)}</p></div>
-                  </div>
-                  <div className="space-y-1.5">
-                    {p.categorias.slice(0, 8).map((c) => {
-                      const pct = p.total ? Math.round((c.monto / p.total) * 100) : 0;
-                      return (
-                        <div key={c.categoria}>
-                          <div className="flex justify-between text-xs"><span className="text-slate-600">{c.categoria}</span><span className="text-slate-500">{clp(c.monto)}</span></div>
-                          <div className="h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-indigo-500" style={{ width: `${pct}%` }} /></div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Card>
-              ))}
-            </div>
+            <PersonasTab movs={movsSel} rango={rango} />
           )}
         </div>
       )}
@@ -446,6 +528,251 @@ function NumRow({ label, value, onChange, small }: { label: string; value: numbe
   );
 }
 
+/* ── selección de meses ── */
+
+// ¿Coincide el movimiento con lo buscado? Comercio, categoría o banco.
+function coincide(m: Mov, q: string) {
+  return (m.comercio || "").toLowerCase().includes(q)
+    || (m.categoria || "").toLowerCase().includes(q)
+    || (m.banco || "").toLowerCase().includes(q);
+}
+
+function catsDeMovs(movs: Mov[]): Cat[] {
+  const acc: Record<string, number> = {};
+  for (const t of movs) { if (t.tipo !== "cargo") continue; const c = t.categoria || "Otros"; acc[c] = (acc[c] || 0) + t.monto; }
+  return Object.entries(acc).map(([categoria, monto]) => ({ categoria, monto })).sort((a, b) => b.monto - a.monto);
+}
+
+// Suma los meses elegidos en un bloque con la MISMA forma que un mes suelto, así el resto de
+// la página no necesita saber si está mirando uno o diez.
+function aggMeses(d: Dash | null, sel: string[]): MesData | undefined {
+  if (!d) return undefined;
+  const list = sel.map((m) => d.porMes?.[m]).filter(Boolean) as MesData[];
+  if (!list.length) return undefined;
+  if (list.length === 1) return list[0];
+  const out: MesData = {
+    santanderCC: { ingresos: 0, egresos: 0 }, biceCC: { ingresos: 0, egresos: 0 }, tarjeta: { gasto: 0 },
+    ingresos: 0, egresos: 0, neto: 0, categorias: [], categoriasTarjeta: [], movsCC: 0, movsTarjeta: 0,
+  };
+  for (const p of list) {
+    for (const b of ["santanderCC", "biceCC"] as const) { out[b].ingresos += p[b].ingresos; out[b].egresos += p[b].egresos; }
+    out.tarjeta.gasto += p.tarjeta.gasto;
+    out.ingresos += p.ingresos; out.egresos += p.egresos;
+    out.movsCC = (out.movsCC ?? 0) + (p.movsCC ?? 0);
+    out.movsTarjeta = (out.movsTarjeta ?? 0) + (p.movsTarjeta ?? 0);
+    out.categorias = mergeCats(out.categorias, p.categorias);
+    out.categoriasTarjeta = mergeCats(out.categoriasTarjeta, p.categoriasTarjeta);
+  }
+  out.neto = out.ingresos - out.egresos;
+  // Con varios meses "falta cartola" solo si NINGUNO tiene cuenta corriente. El caso mixto
+  // (algunos sí, otros no) lo avisa el banner de arriba, que sí sabe cuáles faltan.
+  out.faltaCartola = (out.movsCC ?? 0) === 0;
+  return out;
+}
+
+// Selector de meses MÚLTIPLE: con julio marcado se ve julio; marcando más meses se ve la
+// suma de esos meses, en todas las pestañas.
+function MesPicker({ meses, sel, onChange, porMes }: { meses: string[]; sel: string[]; onChange: (s: string[]) => void; porMes: Record<string, MesData> }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const fuera = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", fuera);
+    return () => document.removeEventListener("mousedown", fuera);
+  }, [open]);
+
+  // Destildar el último mes dejaría la pantalla entera sin datos, así que no se permite.
+  const toggle = (m: string) => {
+    const next = sel.includes(m) ? sel.filter((x) => x !== m) : [...sel, m];
+    if (next.length) onChange([...next].sort());
+  };
+  const label = sel.length === 1 ? mesLabel(sel[0])
+    : sel.length === meses.length ? `Todos · ${meses.length} meses`
+    : `${sel.length} meses`;
+
+  const atajos: [string, number][] = [["Último", 1], ["Últimos 3", 3], ["Últimos 6", 6], ["Todos", meses.length]];
+
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+        {label} <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+      </button>
+      {open && (
+        <div className="absolute right-0 z-20 mt-1 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+          <div className="mb-1 flex flex-wrap gap-1">
+            {atajos.filter(([, n]) => n <= meses.length).map(([l, n]) => (
+              <button key={l} onClick={() => onChange(meses.slice(-n))}
+                className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-200">{l}</button>
+            ))}
+          </div>
+          <div className="max-h-72 overflow-y-auto">
+            {[...meses].reverse().map((m) => {
+              const on = sel.includes(m);
+              const gasto = (porMes[m]?.egresos ?? 0) + (porMes[m]?.tarjeta.gasto ?? 0);
+              return (
+                <div key={m} className={`group flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${on ? "bg-indigo-50" : "hover:bg-slate-50"}`}>
+                  <button onClick={() => toggle(m)} className="flex flex-1 items-center gap-2 text-left">
+                    <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${on ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-300"}`}>
+                      {on && <Check className="h-3 w-3" />}
+                    </span>
+                    <span className={on ? "font-medium text-indigo-700" : "text-slate-600"}>{mesLabel(m)}</span>
+                  </button>
+                  <span className="text-[11px] text-slate-400">{clpShort(gasto)}</span>
+                  <button onClick={() => onChange([m])} className="text-[10px] text-slate-400 opacity-0 hover:text-indigo-600 group-hover:opacity-100">solo</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── PERSONAS: quién gastó qué, con drill-down por categoría ── */
+
+// Categorías que mueven plata pero NO son consumo: el pago de la tarjeta ya está contado como
+// las compras itemizadas del estado de cuenta, y los traspasos entre cuentas propias no son
+// gasto. Sumarlos duplica el total de la persona.
+const NO_CONSUMO = new Set(["Tarjeta de crédito", "Transferencia interna", "Línea de crédito"]);
+
+function PersonasTab({ movs, rango }: { movs: Mov[]; rango: string }) {
+  const [alcance, setAlcance] = useState<"todo" | "celular">("todo");
+  const [sinTraspasos, setSinTraspasos] = useState(true);
+  const [persona, setPersona] = useState("");
+  const [cat, setCat] = useState("");
+
+  const cargos = useMemo(() => movs.filter((m) =>
+    m.tipo === "cargo"
+    && (alcance === "todo" || m.fuente === "wallet")
+    && (!sinTraspasos || !NO_CONSUMO.has(m.categoria))), [movs, alcance, sinTraspasos]);
+
+  // A quién se le imputa cada gasto. Los movimientos de cartola no traen titular porque son
+  // de las cuentas y la tarjeta de Javier; los del Atajo sí lo traen (Javier/Emi).
+  const de = useCallback((m: Mov) => m.titular || (alcance === "todo" ? "Javier" : ""), [alcance]);
+
+  const gente = useMemo(() => {
+    const acc: Record<string, { titular: string; total: number; count: number; wallet: number; cats: Record<string, number> }> = {};
+    for (const m of cargos) {
+      const p = de(m); if (!p) continue;
+      const g = acc[p] || (acc[p] = { titular: p, total: 0, count: 0, wallet: 0, cats: {} });
+      g.total += m.monto; g.count++;
+      if (m.fuente === "wallet") g.wallet += m.monto;
+      const c = m.categoria || "Otros";
+      g.cats[c] = (g.cats[c] || 0) + m.monto;
+    }
+    return Object.values(acc)
+      .map((g) => ({ ...g, categorias: Object.entries(g.cats).map(([categoria, monto]) => ({ categoria, monto })).sort((a, b) => b.monto - a.monto) }))
+      .sort((a, b) => b.total - a.total);
+  }, [cargos, de]);
+
+  const activo = gente.find((g) => g.titular === persona) ?? gente[0];
+  const cats = activo?.categorias ?? [];
+  // Si al cambiar de persona esa categoría no existe, se muestra todo en vez de una lista vacía.
+  const catActiva = cats.some((c) => c.categoria === cat) ? cat : "";
+  const detalle = useMemo(
+    () => cargos.filter((m) => activo && de(m) === activo.titular && (!catActiva || (m.categoria || "Otros") === catActiva)),
+    [cargos, activo, catActiva, de]);
+
+  const controles = (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white p-0.5">
+        {([["todo", "Cartolas + celular"], ["celular", "Solo celular (Atajo)"]] as const).map(([v, l]) => (
+          <button key={v} onClick={() => setAlcance(v)}
+            className={`rounded-md px-2.5 py-1 font-medium transition-colors ${alcance === v ? "bg-[#0a1628] text-white" : "text-slate-500 hover:bg-slate-100"}`}>{l}</button>
+        ))}
+      </div>
+      <label className="flex items-center gap-1.5 text-slate-500">
+        <input type="checkbox" checked={sinTraspasos} onChange={(e) => setSinTraspasos(e.target.checked)} className="h-3.5 w-3.5 rounded border-slate-300" />
+        Sin pagos de tarjeta ni traspasos
+      </label>
+      <span className="text-slate-400">· {rango}</span>
+    </div>
+  );
+
+  const nota = (
+    <p className="text-xs text-slate-400">
+      {alcance === "todo"
+        ? "Javier suma sus cartolas (cuentas y tarjeta a su nombre) más lo que llega por el Atajo; Emi, solo lo que llega desde su celular."
+        : "Solo lo que llega en tiempo real por el Atajo de Wallet (notificaciones del banco)."}
+      {sinTraspasos && " Quedan fuera pagos de tarjeta, línea de crédito y traspasos entre cuentas propias: no son consumo y estarían contados dos veces."}
+    </p>
+  );
+
+  if (!gente.length) {
+    return (
+      <div className="space-y-3">
+        {controles}
+        <Card title={`Sin gastos por persona en ${rango}`}>
+          <p className="text-sm text-slate-500">
+            No hay movimientos de personas en el período elegido. Probá con otros meses arriba
+            {alcance === "celular" ? ", o mirá también las cartolas." : "."}
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {controles}
+      {nota}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {gente.map((p) => {
+          const on = activo?.titular === p.titular;
+          return (
+            <button key={p.titular} onClick={() => { setPersona(p.titular); setCat(""); }}
+              className={`rounded-2xl border bg-white p-5 text-left transition-colors ${on ? "border-indigo-300 ring-1 ring-indigo-200" : "border-slate-200 hover:border-slate-300"}`}>
+              <div className="mb-3 flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">{p.titular === "Emi" ? "👩" : "🧑"} {p.titular}</p>
+                  <p className="text-2xl font-bold text-slate-900">{clp(p.total)}</p>
+                  <p className="text-[11px] text-slate-400">{rango} · {p.count} mov.{p.wallet ? ` · ${clp(p.wallet)} por el celular` : ""}</p>
+                </div>
+                <span className={`shrink-0 text-[11px] font-medium ${on ? "text-indigo-600" : "text-slate-300"}`}>{on ? "viendo" : "ver detalle"}</span>
+              </div>
+              <div className="space-y-1.5">
+                {p.categorias.slice(0, 5).map((c) => {
+                  const pct = p.total ? Math.round((c.monto / p.total) * 100) : 0;
+                  return (
+                    <div key={c.categoria}>
+                      <div className="flex justify-between text-xs"><span className="text-slate-600">{c.categoria}</span><span className="text-slate-500">{clp(c.monto)}</span></div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-indigo-500" style={{ width: `${pct}%` }} /></div>
+                    </div>
+                  );
+                })}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {activo && (
+        <>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card title={`${activo.titular} · en qué gasta · ${rango}`}>
+              <CatPie cats={cats} onSelect={setCat} selected={catActiva} />
+              <p className="mt-1 text-center text-[11px] text-slate-400">Tocá una porción para abrir la categoría.</p>
+            </Card>
+            <Card title="Categorías · tocá una para abrirla">
+              <CatBars cats={cats.slice(0, 10)} onSelect={setCat} selected={catActiva} />
+            </Card>
+          </div>
+          <Card title={catActiva ? `${activo.titular} · ${catActiva} · ${rango}` : `${activo.titular} · todos los gastos · ${rango}`}>
+            {catActiva
+              ? <button onClick={() => setCat("")} className="mb-2 text-xs font-medium text-indigo-600 hover:underline">← ver todas las categorías</button>
+              : <p className="mb-2 -mt-1 text-xs text-slate-400">Todos sus gastos del período, del más grande al más chico.</p>}
+            <MovTable movs={detalle} showCat={!catActiva} />
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ── componentes ── */
 function Kpi({ icon, label, value, color, sub }: { icon: React.ReactNode; label: string; value: string; color: string; sub?: string }) {
   return (
@@ -508,7 +835,7 @@ function CatBars({ cats, onSelect, selected }: { cats: Cat[]; onSelect?: (c: str
     </div>
   );
 }
-function CatPie({ cats }: { cats: Cat[] }) {
+function CatPie({ cats, onSelect, selected }: { cats: Cat[]; onSelect?: (c: string) => void; selected?: string }) {
   const data = cats.slice(0, 8);
   if (!data.length) return <Empty text="Sin datos." />;
   return (
@@ -516,8 +843,15 @@ function CatPie({ cats }: { cats: Cat[] }) {
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-          <Pie data={data} dataKey="monto" nameKey="categoria" cx="50%" cy="50%" outerRadius={80} label={(e: any) => String(e?.categoria ?? "")} labelLine={false} fontSize={10}>
-            {data.map((_, i) => <Cell key={i} fill={PIE[i % PIE.length]} />)}
+          <Pie data={data} dataKey="monto" nameKey="categoria" cx="50%" cy="50%" outerRadius={80} label={(e: any) => String(e?.categoria ?? "")} labelLine={false} fontSize={10}
+            className={onSelect ? "cursor-pointer outline-none" : ""}
+            onClick={(_, i) => onSelect?.(data[i]?.categoria === selected ? "" : data[i]?.categoria ?? "")}>
+            {data.map((c, i) => (
+              <Cell key={i} fill={PIE[i % PIE.length]}
+                stroke={selected === c.categoria ? "#0f172a" : "#fff"}
+                strokeWidth={selected === c.categoria ? 2.5 : 1}
+                opacity={selected && selected !== c.categoria ? 0.45 : 1} />
+            ))}
           </Pie>
           <Tooltip formatter={(v) => clp(Number(v))} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -578,4 +912,79 @@ function mergeCats(a: Cat[], b: Cat[]): Cat[] {
   const map: Record<string, number> = {};
   for (const c of [...a, ...b]) map[c.categoria] = (map[c.categoria] || 0) + c.monto;
   return Object.entries(map).map(([categoria, monto]) => ({ categoria, monto })).sort((x, y) => y.monto - x.monto);
+}
+
+// ─── Estado del Atajo de Wallet ───────────────────────────────────────────────
+//
+// Existe por una pregunta concreta: "hice un pago con la tarjeta, ¿te llegó?". Antes había
+// que mirar los logs de Railway —que se borran en cada deploy— y aun así el endpoint no
+// registraba nada. Acá se ven las tres cosas que se confundían: si llegó y se guardó, si
+// llegó y algo lo rechazó, o si nunca llegó.
+function EstadoAtajo({ estado }: { estado: AtajoEstado | null }) {
+  if (!estado) return null;
+  if (estado.error) {
+    return (
+      <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+        No pude consultar el estado del Atajo ({estado.error}).
+      </p>
+    );
+  }
+
+  const ultimo = estado.ultimos_guardados?.[0];
+  const rechazados = (estado.golpes ?? []).filter((g) => g.resultado !== "guardado");
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span className="font-medium text-slate-700">Atajo del celular</span>
+        <span className="text-slate-500">
+          {estado.guardados_hoy ? `${estado.guardados_hoy} gasto(s) recibidos hoy` : "todavía no llegó ningún gasto hoy"}
+        </span>
+        {ultimo && (
+          <span className="text-slate-400">
+            último: {ultimo.comercio} ${ultimo.monto.toLocaleString("es-CL")} ({fmtHora(ultimo.created_at)})
+          </span>
+        )}
+        <span className="text-slate-400">tokens: {(estado.titulares_configurados ?? []).join(", ") || "ninguno"}</span>
+      </div>
+
+      {rechazados.length > 0 && (
+        <div className="mt-2 border-t border-slate-100 pt-2">
+          {/* La distinción que importa: un intento rechazado que NO vino del iPhone no dice
+              nada sobre el Atajo. Sin esto, una prueba con un token falso se leía como "estás
+              perdiendo compras", que es la conclusión opuesta. */}
+          <p className={estado.atajo_sano === false ? "text-amber-700" : "text-slate-500"}>
+            {estado.atajo_sano === false
+              ? `${rechazados.length} intento(s) del Atajo no se guardaron — hay algo que revisar:`
+              : `${rechazados.length} intento(s) no se guardaron, ninguno del Atajo de tu iPhone (pruebas o llamadas de otro origen):`}
+          </p>
+          <ul className="mt-1 space-y-0.5 text-slate-500">
+            {rechazados.slice(0, 5).map((g, i) => (
+              <li key={i}>
+                {fmtHora(g.cuando)} · <b>{g.resultado.replace(/_/g, " ")}</b>
+                {g.desde ? ` · desde ${g.desde}` : ""}
+                {g.comercio ? ` · ${g.comercio}` : ""}
+                {g.detalle ? ` · ${g.detalle}` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Sin esta línea, "0 intentos" se lee como "el Atajo no disparó" cuando en realidad el
+          router se reinició hace un minuto y perdió el registro. */}
+      {(estado.golpes ?? []).length === 0 && (
+        <p className="mt-2 border-t border-slate-100 pt-2 text-slate-400">
+          Sin intentos registrados desde que el router arrancó{estado.arrancado ? ` (${fmtHora(estado.arrancado)})` : ""}.
+          Los gastos guardados antes de eso siguen contados arriba.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function fmtHora(iso: string) {
+  try {
+    return new Date(iso).toLocaleString("es-CL", { timeZone: "America/Santiago", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+  } catch { return iso; }
 }

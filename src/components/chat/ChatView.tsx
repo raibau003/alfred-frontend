@@ -29,7 +29,13 @@ interface Props {
   shoppingMode?: boolean;
   onNewThread?: () => void;
   showCart?: boolean;            // default true; en salud/coach se oculta el carro
-  trainingsSheetUrl?: string;    // si viene, muestra la pesa → abre los entrenamientos generados (Excel)
+  // La pesa del encabezado. Con onTrainings abre la pestaña del plan DENTRO de la vista;
+  // el enlace al Excel queda como respaldo para cuando no hay una vista a la que ir.
+  onTrainings?: () => void;
+  // Los atajos de abajo. Los genéricos ("Busca alternativas") mandados a un nutricionista
+  // disparaban una búsqueda web de links sueltos: cada asesor necesita los suyos.
+  sugerencias?: string[];
+  trainingsSheetUrl?: string;
 }
 
 // Extracts search terms from user message (split by commas, "y", newlines)
@@ -102,7 +108,7 @@ function groupProductsBySearchTerm(
   return result;
 }
 
-export function ChatView({ messages, busy, connected, onSend, onStop, userName, onToggleThreads, showThreadsButton, shoppingMode, onNewThread, showCart = true, trainingsSheetUrl }: Props) {
+export function ChatView({ messages, busy, connected, onSend, onStop, userName, onToggleThreads, showThreadsButton, shoppingMode, onNewThread, showCart = true, onTrainings, trainingsSheetUrl, sugerencias }: Props) {
   const [input, setInput] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [reactions, setReactions] = useState<Record<string, "up" | "down">>({});
@@ -227,7 +233,15 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {trainingsSheetUrl && (
+          {onTrainings ? (
+            <button
+              onClick={onTrainings}
+              className="relative flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[10px] text-slate-500 transition-colors hover:bg-slate-50 hover:text-[#0a1628]"
+              title="Ver el entrenamiento de la semana"
+            >
+              <Dumbbell className="h-3.5 w-3.5" />
+            </button>
+          ) : trainingsSheetUrl ? (
             <a
               href={trainingsSheetUrl}
               target="_blank"
@@ -237,7 +251,7 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
             >
               <Dumbbell className="h-3.5 w-3.5" />
             </a>
-          )}
+          ) : null}
           {showCart && (
             <button
               onClick={() => { setCartOpen(!cartOpen); if (!cartOpen) loadCart(); }}
@@ -550,7 +564,7 @@ export function ChatView({ messages, busy, connected, onSend, onStop, userName, 
           {/* Follow-up suggestions after last response */}
           {!busy && messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && !messages[messages.length - 1]?.content.includes("% (~") && messages[messages.length - 1]?.content.length > 50 && (
             <div className="flex flex-wrap gap-1.5 mt-2 px-1">
-              {["Dame mas detalles", "Que mas puedes hacer con esto?", "Busca alternativas"].map(q => (
+              {(sugerencias ?? ["Dame mas detalles", "Que mas puedes hacer con esto?", "Busca alternativas"]).map(q => (
                 <button key={q} onClick={() => onSend(q)} className="rounded-full border border-slate-200 px-3 py-1 text-[10px] text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition-colors">
                   {q}
                 </button>
