@@ -1196,9 +1196,12 @@ export type VersionMenu = {
   comidas: number;
 };
 
+export type ProductoCompra = { producto: string; cantidad: number | null; unidad: string | null };
+
 export type PlanAlimentacion = {
   tabla: FilaAlimentacion[];
   alternativas: VersionMenu[];
+  compras: { productos: ProductoCompra[]; cuantos: number; texto: string[]; sin_cantidad: string[] };
   pauta: {
     kcal_objetivo: number; proteina_g: number; carbo_g: number; grasa_g: number;
     objetivo: string; explicacion: string;
@@ -1215,6 +1218,7 @@ export type PlanAlimentacion = {
 
 const SIN_MENU: PlanAlimentacion = {
   tabla: [], alternativas: [], pauta: null, dias_definidos: 0, aviso: null,
+  compras: { productos: [], cuantos: 0, texto: [], sin_cantidad: [] },
   perfil: { objetivo: null, comidas: null, restricciones: null, no_come: null,
             horarios: null, comidas_fuera: null, alcohol: null, dia_libre: null },
 };
@@ -1239,6 +1243,22 @@ export async function elegirVersionMenu(id: string): Promise<{ ok?: boolean; nom
       method: "POST",
       headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify({ id }),
+    });
+    const j = await r.json();
+    return r.ok ? j : { error: j?.error ?? `el router respondió ${r.status}` };
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
+/** Manda la lista del menú a la lista de compras de la casa. */
+export async function agregarComprasDelMenu(): Promise<{ ok?: boolean; mensaje?: string; error?: string }> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/lista/desde-nutricion`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      body: JSON.stringify({}),
     });
     const j = await r.json();
     return r.ok ? j : { error: j?.error ?? `el router respondió ${r.status}` };
