@@ -1163,6 +1163,63 @@ const SIN_PLAN: PlanEntrenamiento = {
   vigente: null, alternativas: [], generado_en: null, kcal_entrenamiento: 0, peso: 80,
 };
 
+// ── La semana de COMIDA ─────────────────────────────────────────────────────
+//
+// Espeja a getPlanEntrenamiento a propósito: son las dos mitades de la misma pregunta
+// ("¿qué me toca esta semana?") y conviene que se lean igual.
+
+export type ComidaPlan = {
+  tipo: string;
+  plato: string;
+  cantidades: string | null;
+  kcal: number | null;
+  proteina_g: number | null;
+  ingredientes: string[];
+};
+
+export type FilaAlimentacion = {
+  dia: string;
+  nombre: string;
+  estado: "definido" | "sin_definir";
+  comidas: ComidaPlan[];
+  kcal_dia: number | null;
+};
+
+export type PlanAlimentacion = {
+  tabla: FilaAlimentacion[];
+  pauta: {
+    kcal_objetivo: number; proteina_g: number; carbo_g: number; grasa_g: number;
+    objetivo: string; explicacion: string;
+  } | null;
+  perfil: {
+    objetivo: string | null; comidas: number | null; restricciones: string | null;
+    no_come: string | null; horarios: string | null; comidas_fuera: number | null;
+    alcohol: string | null; dia_libre: string | null;
+  };
+  dias_definidos: number;
+  aviso: string | null;
+  error?: string;
+};
+
+const SIN_MENU: PlanAlimentacion = {
+  tabla: [], pauta: null, dias_definidos: 0, aviso: null,
+  perfil: { objetivo: null, comidas: null, restricciones: null, no_come: null,
+            horarios: null, comidas_fuera: null, alcohol: null, dia_libre: null },
+};
+
+export async function getPlanAlimentacion(): Promise<PlanAlimentacion> {
+  try {
+    const url = await getRouterUrl();
+    const r = await fetch(`${url}/nutricion/plan`, { headers: await authHeaders() });
+    if (!r.ok) return { ...SIN_MENU, error: `el router respondió ${r.status}` };
+    return await r.json();
+  } catch (e) {
+    // Mismo criterio que en entrenamiento: "no pude preguntar" y "no tenés menú" se ven
+    // igual en pantalla, y solo el primero se arregla reintentando.
+    return { ...SIN_MENU, error: String(e) };
+  }
+}
+
 export async function getPlanEntrenamiento(): Promise<PlanEntrenamiento> {
   try {
     const url = await getRouterUrl();
