@@ -30,7 +30,12 @@ export function useAlfred(threadId?: string, chatKey?: string) {
   const threadIdRef = useRef<string | null>(threadId ?? null);
   const sessionRef = useRef<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const seenTextsRef = useRef<Set<string>>(new Set());
+  // Cuántos mensajes del router ya se pintaron. Antes esto era un Set de TEXTOS que se
+  // limpiaba en cada envío: al mandar el segundo mensaje, las respuestas del turno anterior
+  // volvían a parecer nuevas y se pintaban de nuevo. El 2026-07-27, "[coach] hola" seguido de
+  // "quiero armar un plan" mostró el mismo saludo dos veces. Un índice no se confunde ni
+  // cuando el agente contesta dos veces lo mismo.
+  const pintadosRef = useRef(0);
 
   // Sincronizar ref + estado cuando cambia el threadId (ej: seleccionar otro hilo en el sidebar).
   // Sin esto, los mensajes nuevos se guardaban en el thread_id viejo (ref inicializado una sola vez).
@@ -38,7 +43,7 @@ export function useAlfred(threadId?: string, chatKey?: string) {
     threadIdRef.current = threadId ?? null;
     setCurrentThreadId(threadId ?? null);
     setMessages([]);
-    seenTextsRef.current = new Set();
+    pintadosRef.current = 0;
   }, [threadId]);
 
   // Load existing messages from Supabase if threadId provided
@@ -67,10 +72,13 @@ export function useAlfred(threadId?: string, chatKey?: string) {
   // Initialize Router session
   const initSession = useCallback(async () => {
     if (sessionRef.current) return;
-    const sid = await createSession(`Web ${user?.email ?? "user"}`, user?.id,
+    const sesion = await createSession(`Web ${user?.email ?? "user"}`, user?.id,
       chatKey ? `web:${chatKey}:${user?.email ?? "user"}` : undefined);
-    if (sid) {
-      sessionRef.current = sid;
+    if (sesion) {
+      sessionRef.current = sesion.id;
+      // El router hereda las últimas vueltas del chat para tener contexto. Ya están en
+      // pantalla: se cuentan como pintadas o el primer poll las duplica.
+      pintadosRef.current = sesion.heredados;
       setConnected(true);
     }
   }, [user, chatKey]);
@@ -130,12 +138,11 @@ export function useAlfred(threadId?: string, chatKey?: string) {
           const { messages: msgs, status } = result;
           console.log(`[alfred-poll] session=${sessionRef.current?.substring(0,20)} status=${status} msgs=${msgs.length}`);
 
-          // Show any new assistant messages
+          // Solo lo que llegó DESPUÉS de lo ya pintado.
           let hasNew = false;
-          for (const msg of msgs) {
+          for (let i = pintadosRef.current; i < msgs.length; i++) {
+            const msg = msgs[i];
             if (msg.role !== "assistant") continue;
-            if (seenTextsRef.current.has(msg.text)) continue;
-            seenTextsRef.current.add(msg.text);
             hasNew = true;
 
             setMessages((prev) => [...prev, {
@@ -148,6 +155,7 @@ export function useAlfred(threadId?: string, chatKey?: string) {
             }]);
           }
 
+          pintadosRef.current = msgs.length;
           if (hasNew) lastHeartbeat = Date.now();
 
           // Heartbeat: if no new messages for 15s, show "sigue trabajando"
@@ -232,7 +240,6 @@ export function useAlfred(threadId?: string, chatKey?: string) {
 
       saveMessage("user", text);
       setBusy(true);
-      seenTextsRef.current.clear();
 
       try {
         await sendPrompt(sessionRef.current, text);
@@ -249,7 +256,7 @@ export function useAlfred(threadId?: string, chatKey?: string) {
     setCurrentThreadId(null);
     threadIdRef.current = null;
     sessionRef.current = null;
-    seenTextsRef.current.clear();
+    pintadosRef.current = 0;
     if (pollRef.current) clearInterval(pollRef.current);
     setBusy(false);
     initSession();

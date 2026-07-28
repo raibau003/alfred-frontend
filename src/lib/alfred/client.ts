@@ -25,7 +25,15 @@ export interface AlfredMessage {
   rich?: { type: string; products?: any[]; actions?: any[]; [key: string]: any };
 }
 
-export async function createSession(title: string, userId?: string, chatId?: string): Promise<string | null> {
+/**
+ * Crea la sesión en el router.
+ *
+ * Devuelve también `heredados`: cuántos mensajes viejos del chat trae la sesión recién
+ * creada. El router hereda las últimas vueltas para que el agente tenga contexto, pero esos
+ * mensajes YA están en pantalla (salen de conversation_messages). Si el polling los toma por
+ * nuevos, se pintan dos veces.
+ */
+export async function createSession(title: string, userId?: string, chatId?: string): Promise<{ id: string; heredados: number } | null> {
   try {
     const url = await getRouterUrl();
     const resp = await fetch(`${url}/session`, {
@@ -34,7 +42,7 @@ export async function createSession(title: string, userId?: string, chatId?: str
       body: JSON.stringify({ directory: "/home/agent/sandbox", title, user_id: userId, chat_id: chatId }),
     });
     const data = await resp.json();
-    return data?.id ?? null;
+    return data?.id ? { id: data.id, heredados: Number(data.heredados) || 0 } : null;
   } catch {
     return null;
   }
