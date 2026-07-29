@@ -18,7 +18,6 @@
 //    nutricionista para que exista. Un estado vacío sin salida es una pared.
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import {
   Loader2, RefreshCw, AlertTriangle, Salad, Moon, Flame, Check, MessageSquare, ShoppingCart,
   Store, Send, ArrowRight,
@@ -214,6 +213,16 @@ export function PlanAlimentacion({ onHablar, chat }: { onHablar?: () => void; ch
             compras={p.compras}
             agregando={agregando}
             enLista={enLista}
+            onBuscarEnSuper={async () => {
+              // Se manda la lista ANTES de navegar: si se hiciera del otro lado,
+              // el usuario vería la pantalla del súper con la lista todavía vacía.
+              setAgregando(true);
+              const r = await agregarComprasDelMenu();
+              setAgregando(false);
+              if (r.error) { setAviso({ tipo: "error", texto: r.error }); return; }
+              setEnLista(true);
+              window.location.href = "/shopping?tab=lista&buscar=1";
+            }}
             onAgregar={async () => {
               setAgregando(true);
               setAviso(null);
@@ -328,12 +337,13 @@ function TablaSemana({ filas }: { filas: FilaAlimentacion[] }) {
 // Se muestra CON las cantidades ya sumadas entre días ("pollo 350 g", no "pollo" tres
 // veces): en la góndola lo que se necesita saber es cuánto, no qué.
 function ListaCompras({
-  compras, agregando, enLista, onAgregar,
+  compras, agregando, enLista, onAgregar, onBuscarEnSuper,
 }: {
   compras: Plan["compras"];
   agregando: boolean;
   enLista: boolean;
   onAgregar: () => void;
+  onBuscarEnSuper: () => void;
 }) {
   if (!compras?.cuantos) return null;
   return (
@@ -357,18 +367,20 @@ function ListaCompras({
             {enLista ? "Actualizar mi lista" : "Agregar a mi lista"}
           </button>
 
-          {/* Acá terminaba el flujo: la lista se agregaba y no había forma de saber
-              dónde había quedado ni cómo seguir. Comprar es el punto de todo esto,
-              así que el paso siguiente tiene que estar a un click y decir a dónde
-              lleva. La pestaña `lista` se abre por query param. */}
-          <Link
-            href="/shopping?tab=lista"
-            className="flex items-center gap-1.5 rounded-lg bg-[#0a1628] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#16233a]"
+          {/* Este botón hace las TRES cosas, no una.
+              La primera versión solo navegaba a /shopping, y ahí la lista quedaba
+              quieta esperando que alguien se diera cuenta de que faltaba apretar
+              "Buscar precios" adentro. Un botón que dice "buscar" y solo cambia de
+              pantalla miente: manda la lista, va al súper y arranca la búsqueda. */}
+          <button
+            onClick={onBuscarEnSuper}
+            disabled={agregando}
+            className="flex items-center gap-1.5 rounded-lg bg-[#0a1628] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#16233a] disabled:opacity-60"
           >
-            <Store className="h-3 w-3" />
+            {agregando ? <Loader2 className="h-3 w-3 animate-spin" /> : <Store className="h-3 w-3" />}
             Buscar lista en supermercados
             <ArrowRight className="h-3 w-3" />
-          </Link>
+          </button>
         </div>
       </div>
 
