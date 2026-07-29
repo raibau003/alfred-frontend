@@ -284,6 +284,40 @@ function VistaLista() {
 
   useEffect(() => { recargar(); }, [recargar]);
 
+  /**
+   * Busca precios hasta que no queden pendientes.
+   *
+   * El router busca de a 8 por llamada. Con 33 productos, UNA llamada deja 25 sin
+   * buscar — y desde afuera eso se ve como "hizo algo y se quedó ahí", que es
+   * exactamente lo que reportó Javier. El tope de vueltas existe porque un bucle
+   * que no corta acá son minutos de scraping contra cinco supermercados.
+   */
+  const buscarTodo = useCallback(async () => {
+    setCargando(true);
+    let vuelta = 0;
+    let encontrados = 0;
+    let ultimo = "";
+    while (vuelta < 8) {
+      vuelta++;
+      const r = await buscarPreciosLista(8);
+      if (r.error) { ultimo = r.error; break; }
+      encontrados += Number(r.productos_encontrados ?? 0);
+      const quedan = r.pendientes?.length ?? 0;
+      ultimo = r.mensaje ?? "";
+      setNota(quedan
+        ? `Buscando precios… ${encontrados} productos encontrados, quedan ${quedan} por buscar.`
+        : `Listo: ${encontrados} productos encontrados.`);
+      if (!quedan) break;
+    }
+    if (vuelta >= 8) {
+      setNota(`Paré a las 8 vueltas — ${encontrados} productos encontrados y todavía quedaban. Apretá "Buscar precios" para seguir.`);
+    } else if (ultimo && !encontrados) {
+      setNota(ultimo);
+    }
+    setCargando(false);
+    await recargar();
+  }, [recargar]);
+
   // Llegar desde el menú con `?buscar=1` arranca la búsqueda sola.
   //
   // Antes, "Buscar lista en supermercados" solo abría esta pestaña y dejaba la
@@ -296,21 +330,17 @@ function VistaLista() {
     if (new URLSearchParams(window.location.search).get("buscar") !== "1") return;
     setYaBusque(true);
     (async () => {
-      setCargando(true);
       // Primero se trae lo del menú: si el usuario vino directo, la lista puede
       // estar vacía y buscar precios de nada no diría nada útil.
       await listaDesdeMenu();
-      const r = await buscarPreciosLista(8);
-      setNota(r.mensaje ?? r.error ?? "Busqué los precios de tu lista.");
-      setCargando(false);
-      await recargar();
+      await buscarTodo();
       // Se saca el parámetro para que recargar la página no vuelva a disparar
       // una búsqueda que cuesta minutos.
       const u = new URL(window.location.href);
       u.searchParams.delete("buscar");
       window.history.replaceState({}, "", u);
     })();
-  }, [yaBusque, recargar]);
+  }, [yaBusque, buscarTodo]);
 
   const calcular = async () => {
     setCargando(true);
@@ -325,7 +355,7 @@ function VistaLista() {
           className="rounded-lg bg-[#0a1628] px-3 py-1.5 text-xs font-medium text-white">
           Traer del menú
         </button>
-        <button onClick={async () => { setCargando(true); const r = await buscarPreciosLista(8); setNota(r.mensaje ?? r.error ?? null); setCargando(false); }}
+        <button onClick={() => void buscarTodo()}
           disabled={cargando}
           className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
           {cargando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />} Buscar precios
