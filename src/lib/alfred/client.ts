@@ -111,15 +111,109 @@ export { ROUTER_URL };
 // del router, que calcula sobre los productos ya encontrados en ~9 ms.
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Los endpoints del carro derivan el usuario del JWT: sin este header responden 401.
+// Los endpoints protegidos del router derivan el usuario del JWT: sin este header
+// responden 401.
+//
+// El `catch {}` de antes se tragaba TODO. Si no había sesión —o el token había
+// vencido y nadie lo refrescó— la request salía sin credencial, el router la
+// rechazaba, y la pantalla decía "el router respondió 401". O sea que el mensaje
+// culpaba al backend de un problema del navegador, y la única acción que ofrecía
+// ("probá actualizar") no podía arreglarlo nunca.
 async function authHeaders(): Promise<Record<string, string>> {
   const h: Record<string, string> = { "Content-Type": "application/json" };
+  const token = await tokenDeSesion();
+  if (token) h.Authorization = `Bearer ${token}`;
+  return h;
+}
+
+/** El access_token de la sesión, o null. Refresca si está por vencer. */
+async function tokenDeSesion(forzarRefresco = false): Promise<string | null> {
   try {
     const { createClient } = await import("@/lib/supabase/client");
-    const { data } = await createClient().auth.getSession();
-    if (data.session?.access_token) h.Authorization = `Bearer ${data.session.access_token}`;
-  } catch {}
-  return h;
+    const supabase = createClient();
+    if (forzarRefresco) {
+      const { data } = await supabase.auth.refreshSession();
+      return data.session?.access_token ?? null;
+    }
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Convierte una respuesta fallida en un mensaje que dice QUÉ hacer.
+ *
+ * Un 401 tiene dos causas muy distintas y hasta ahora se veían iguales:
+ * el navegador no mandó credencial (volvé a entrar) o el router la rechazó
+ * (problema del backend). Solo la primera la puede arreglar quien está mirando.
+ */
+async function explicarFallo(status: number, habiaToken: boolean): Promise<string> {
+  if (status === 401) {
+    return habiaToken
+      ? "el router rechazó tu sesión (401) — puede haber vencido; salí y volvé a entrar"
+      : "no hay sesión en este navegador (401) — volvé a iniciar sesión";
+  }
+  if (status === 403) return "tu usuario no tiene permiso (403)";
+  if (status >= 500) return `el router falló (${status})`;
+  return `el router respondió ${status}`;
+}
+
+/**
+ * GET a un endpoint protegido, con un reintento si el token estaba vencido.
+ *
+ * El reintento existe porque el caso más común no es "no tenés sesión" sino
+ * "tenías una y venció mientras la pestaña estaba abierta". Refrescar y repetir
+ * resuelve eso sin que nadie tenga que apretar nada.
+ */
+async function getProtegido(ruta: string): Promise<{ ok: true; datos: unknown } | { ok: false; error: string }> {
+  const url = await getRouterUrl();
+  let token = await tokenDeSesion();
+  let r = await fetch(`${url}${ruta}`, {
+    headers: token ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` } : { "Content-Type": "application/json" },
+  });
+
+  if (r.status === 401 && token) {
+    token = await tokenDeSesion(true);
+    if (token) {
+      r = await fetch(`${url}${ruta}`, {
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
+    }
+  }
+
+  if (!r.ok) return { ok: false, error: await explicarFallo(r.status, !!token) };
+  return { ok: true, datos: await r.json() };
+}
+
+/** Lo mismo para POST. Mismo reintento, misma explicación. */
+async function postProtegido(
+  ruta: string,
+  cuerpo: unknown = {},
+  opciones: { signal?: AbortSignal } = {},
+): Promise<{ ok: true; datos: any } | { ok: false; error: string }> {
+  const url = await getRouterUrl();
+  const body = JSON.stringify(cuerpo ?? {});
+  const pedir = (t: string | null) => fetch(`${url}${ruta}`, {
+    method: "POST",
+    headers: t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" },
+    body,
+    signal: opciones.signal,
+  });
+
+  let token = await tokenDeSesion();
+  let r = await pedir(token);
+  if (r.status === 401 && token) {
+    token = await tokenDeSesion(true);
+    if (token) r = await pedir(token);
+  }
+
+  // El cuerpo puede no ser JSON cuando el que responde es un proxy y no el router.
+  let j: any = null;
+  try { j = await r.json(); } catch {}
+  if (!r.ok) return { ok: false, error: j?.error ?? await explicarFallo(r.status, !!token) };
+  return { ok: true, datos: j };
 }
 
 export interface EstrategiaTienda {
@@ -1225,10 +1319,9 @@ const SIN_MENU: PlanAlimentacion = {
 
 export async function getPlanAlimentacion(): Promise<PlanAlimentacion> {
   try {
-    const url = await getRouterUrl();
-    const r = await fetch(`${url}/nutricion/plan`, { headers: await authHeaders() });
-    if (!r.ok) return { ...SIN_MENU, error: `el router respondió ${r.status}` };
-    return await r.json();
+    const r = await getProtegido("/nutricion/plan");
+    if (!r.ok) return { ...SIN_MENU, error: r.error };
+    return r.datos as PlanAlimentacion;
   } catch (e) {
     // Mismo criterio que en entrenamiento: "no pude preguntar" y "no tenés menú" se ven
     // igual en pantalla, y solo el primero se arregla reintentando.
@@ -1238,14 +1331,8 @@ export async function getPlanAlimentacion(): Promise<PlanAlimentacion> {
 
 export async function elegirVersionMenu(id: string): Promise<{ ok?: boolean; nombre?: string; mensaje?: string; error?: string }> {
   try {
-    const url = await getRouterUrl();
-    const r = await fetch(`${url}/nutricion/elegir`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-      body: JSON.stringify({ id }),
-    });
-    const j = await r.json();
-    return r.ok ? j : { error: j?.error ?? `el router respondió ${r.status}` };
+    const r = await postProtegido("/nutricion/elegir", { id });
+    return r.ok ? r.datos : { error: r.error };
   } catch (e) {
     return { error: String(e) };
   }
@@ -1254,14 +1341,8 @@ export async function elegirVersionMenu(id: string): Promise<{ ok?: boolean; nom
 /** Manda la lista del menú a la lista de compras de la casa. */
 export async function agregarComprasDelMenu(): Promise<{ ok?: boolean; mensaje?: string; error?: string }> {
   try {
-    const url = await getRouterUrl();
-    const r = await fetch(`${url}/lista/desde-nutricion`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-      body: JSON.stringify({}),
-    });
-    const j = await r.json();
-    return r.ok ? j : { error: j?.error ?? `el router respondió ${r.status}` };
+    const r = await postProtegido("/lista/desde-nutricion", {});
+    return r.ok ? r.datos : { error: r.error };
   } catch (e) {
     return { error: String(e) };
   }
@@ -1269,10 +1350,9 @@ export async function agregarComprasDelMenu(): Promise<{ ok?: boolean; mensaje?:
 
 export async function getPlanEntrenamiento(): Promise<PlanEntrenamiento> {
   try {
-    const url = await getRouterUrl();
-    const r = await fetch(`${url}/entrenamiento/plan`, { headers: await authHeaders() });
-    if (!r.ok) return { ...SIN_PLAN, error: `el router respondió ${r.status}` };
-    return await r.json();
+    const r = await getProtegido("/entrenamiento/plan");
+    if (!r.ok) return { ...SIN_PLAN, error: r.error };
+    return r.datos as PlanEntrenamiento;
   } catch (e) {
     // Se devuelve el error y no un plan vacío: "no pude preguntar" y "no tenés plan" se
     // ven igual en pantalla, y el primero se arregla reintentando.

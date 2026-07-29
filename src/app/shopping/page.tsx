@@ -12,6 +12,9 @@ import { CocinaPanel } from "@/components/shopping/CocinaPanel";
 
 type StoreProgress = Record<string, { name?: string; done: number; total: number; status: string; added?: number; failed?: number }>;
 
+const TABS_VALIDAS = ["chat", "menu", "inventario", "lista", "config"] as const;
+type TabCompras = (typeof TABS_VALIDAS)[number];
+
 export default function ShoppingPage() {
   const { user } = useAuth();
   const alfred = useAlfred();
@@ -29,7 +32,18 @@ export default function ShoppingPage() {
   // donde la gente mira es una función que no existe.
   //
   // El nombre "Cocina" quedó para la vista del inventario, que es como Javier la llama.
-  const [tab, setTab] = useState<"chat" | "menu" | "inventario" | "lista" | "config">("chat");
+  //
+  // La pestaña se puede fijar por query param (`/shopping?tab=lista`) para que se
+  // pueda enlazar desde afuera. Sin eso, el botón "Buscar lista en supermercados"
+  // del menú de nutrición dejaba a Javier en el chat, teniendo que buscar a mano
+  // la lista que acababa de agregar: la mitad de un flujo no es un flujo.
+  const [tab, setTab] = useState<TabCompras>("chat");
+
+  useEffect(() => {
+    const pedida = new URLSearchParams(window.location.search).get("tab");
+    // Solo pestañas que existen: un `?tab=` inventado dejaría la vista en blanco.
+    if (pedida && (TABS_VALIDAS as readonly string[]).includes(pedida)) setTab(pedida as TabCompras);
+  }, []);
 
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearWatchdog = () => { if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; } };
