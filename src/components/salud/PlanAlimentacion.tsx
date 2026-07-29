@@ -18,25 +18,51 @@
 //    nutricionista para que exista. Un estado vacío sin salida es una pared.
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Loader2, RefreshCw, AlertTriangle, Salad, Moon, Flame, Check, MessageSquare, ShoppingCart,
+  Store, Send, ArrowRight,
 } from "lucide-react";
 import {
   getPlanAlimentacion, elegirVersionMenu, agregarComprasDelMenu,
   type PlanAlimentacion as Plan, type FilaAlimentacion, type VersionMenu,
 } from "@/lib/alfred/client";
+import { useAuth } from "@/components/auth/AuthProvider";
+import type { useAlfred } from "@/hooks/useAlfred";
+
+/**
+ * La conversación con el nutricionista, prestada desde la página.
+ *
+ * NO se llama a `useAlfred` acá adentro: la pestaña del nutricionista ya tiene
+ * su instancia, y una segunda con la misma `chatKey` crea una SEGUNDA sesión en
+ * el router sobre el mismo chat. Además de duplicar sesiones, dejaba las dos
+ * mitades desincronizadas: se pedía un cambio abajo, se abría "ver la
+ * conversación completa", y el mensaje recién mandado no estaba ahí porque esa
+ * otra sesión no lo había visto.
+ */
+type ChatAlfred = ReturnType<typeof useAlfred>;
 
 const NOMBRE_COMIDA: Record<string, string> = {
   desayuno: "Desayuno", snack_am: "Media mañana", almuerzo: "Almuerzo",
   snack_pm: "Snack", snack: "Snack", cena: "Cena", colacion: "Colación",
 };
 
-export function PlanAlimentacion({ onHablar }: { onHablar?: () => void }) {
+/** Un 401 del navegador no se arregla apretando "actualizar". */
+function esProblemaDeSesion(error: string) {
+  return /401|sesi[oó]n/i.test(error);
+}
+
+export function PlanAlimentacion({ onHablar, chat }: { onHablar?: () => void; chat?: ChatAlfred }) {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [cargando, setCargando] = useState(true);
   const [eligiendo, setEligiendo] = useState<string | null>(null);
   const [agregando, setAgregando] = useState(false);
   const [aviso, setAviso] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
+  // Cuando la lista ya se mandó, el paso siguiente es ir a buscarla al súper. Sin
+  // esto la acción terminaba en un cartelito verde y había que adivinar dónde
+  // quedó lo que se acababa de agregar.
+  const [enLista, setEnLista] = useState(false);
+  const { signOut } = useAuth();
 
   const cargar = useCallback(async (spinner = true) => {
     if (spinner) setCargando(true);
@@ -92,8 +118,20 @@ export function PlanAlimentacion({ onHablar }: { onHablar?: () => void }) {
         </button>
       </div>
 
+      {/* Un error de sesión no se arregla actualizando, y decirle a alguien que
+          apriete un botón que no puede funcionar es peor que no decirle nada. Cuando
+          el 401 viene del navegador, el botón que se ofrece es el que sí sirve. */}
       {p.error && (
-        <Banda tipo="error">No pude leer tu menú ({p.error}). Probá actualizar.</Banda>
+        <Banda tipo="error">
+          No pude leer tu menú: {p.error}.{" "}
+          {esProblemaDeSesion(p.error) ? (
+            <button onClick={() => void signOut()} className="font-semibold underline underline-offset-2">
+              Volver a entrar
+            </button>
+          ) : (
+            "Probá actualizar."
+          )}
+        </Banda>
       )}
       {aviso && <Banda tipo={aviso.tipo === "ok" ? "ok" : "error"}>{aviso.texto}</Banda>}
       {p.aviso && !p.error && <Banda tipo="alerta">{p.aviso}</Banda>}
@@ -175,16 +213,28 @@ export function PlanAlimentacion({ onHablar }: { onHablar?: () => void }) {
           <ListaCompras
             compras={p.compras}
             agregando={agregando}
+            enLista={enLista}
             onAgregar={async () => {
               setAgregando(true);
               setAviso(null);
               const r = await agregarComprasDelMenu();
               setAgregando(false);
-              setAviso(r.error
-                ? { tipo: "error", texto: r.error }
-                : { tipo: "ok", texto: r.mensaje ?? "Lo agregué a tu lista de compras." });
+              if (r.error) { setAviso({ tipo: "error", texto: r.error }); return; }
+              setEnLista(true);
+              setAviso({ tipo: "ok", texto: r.mensaje ?? "Lo agregué a tu lista de compras." });
             }}
           />
+          {/* Pedir un cambio no debería obligar a cambiar de pestaña y perder de vista
+              la tabla que se quiere cambiar. El chat va acá abajo, con el menú a la
+              vista, y al terminar el plan se recarga solo. */}
+          {chat && (
+            <ChatDelMenu
+              chat={chat}
+              menuEnUso={p.alternativas.find(v => v.elegido)?.nombre ?? null}
+              onListo={() => void cargar(false)}
+              onAbrirChatCompleto={onHablar}
+            />
+          )}
         </>
       )}
 
@@ -278,10 +328,11 @@ function TablaSemana({ filas }: { filas: FilaAlimentacion[] }) {
 // Se muestra CON las cantidades ya sumadas entre días ("pollo 350 g", no "pollo" tres
 // veces): en la góndola lo que se necesita saber es cuánto, no qué.
 function ListaCompras({
-  compras, agregando, onAgregar,
+  compras, agregando, enLista, onAgregar,
 }: {
   compras: Plan["compras"];
   agregando: boolean;
+  enLista: boolean;
   onAgregar: () => void;
 }) {
   if (!compras?.cuantos) return null;
@@ -294,14 +345,31 @@ function ListaCompras({
             {compras.cuantos} productos
           </span>
         </h3>
-        <button
-          onClick={onAgregar}
-          disabled={agregando}
-          className="flex items-center gap-1.5 rounded-lg bg-[#0a1628] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#16233a] disabled:opacity-60"
-        >
-          {agregando ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShoppingCart className="h-3 w-3" />}
-          Agregar a mi lista
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={onAgregar}
+            disabled={agregando}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            {agregando ? <Loader2 className="h-3 w-3 animate-spin" />
+              : enLista ? <Check className="h-3 w-3 text-emerald-600" />
+              : <ShoppingCart className="h-3 w-3" />}
+            {enLista ? "Actualizar mi lista" : "Agregar a mi lista"}
+          </button>
+
+          {/* Acá terminaba el flujo: la lista se agregaba y no había forma de saber
+              dónde había quedado ni cómo seguir. Comprar es el punto de todo esto,
+              así que el paso siguiente tiene que estar a un click y decir a dónde
+              lleva. La pestaña `lista` se abre por query param. */}
+          <Link
+            href="/shopping?tab=lista"
+            className="flex items-center gap-1.5 rounded-lg bg-[#0a1628] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#16233a]"
+          >
+            <Store className="h-3 w-3" />
+            Buscar lista en supermercados
+            <ArrowRight className="h-3 w-3" />
+          </Link>
+        </div>
       </div>
 
       <ul className="grid gap-x-6 gap-y-1 text-xs text-slate-700 sm:grid-cols-2 lg:grid-cols-3">
@@ -322,6 +390,123 @@ function ListaCompras({
           Sin cantidad en el menú: {compras.sin_cantidad.join(", ")}. Si le pedís al
           nutricionista que las precise, la próxima lista sale completa.
         </p>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pedir un cambio sin perder de vista el menú.
+//
+// Antes, para cambiar la cena del martes había que irse a la pestaña del
+// nutricionista — o sea, dejar de ver justo la tabla que se quería cambiar— y
+// después volver y acordarse de actualizar. El chat vive acá abajo.
+//
+// Dos cosas que el componente hace y no son obvias:
+//
+//   · Prefija `[nutricion]` como el chat grande, para que el router elija el
+//     agente sin que haya que nombrarlo.
+//   · **Le dice al agente qué menú está mirando.** Sin eso, "cambiá la cena del
+//     martes" es ambiguo cuando hay tres versiones guardadas, y el agente
+//     editaba la que él creía.
+//
+// Y avisa lo que la pantalla vacía ya decía: proponer no es guardar. Un cambio
+// que el nutricionista propone no queda en la tabla hasta que se confirma.
+// ─────────────────────────────────────────────────────────────────────────────
+function ChatDelMenu({
+  chat, menuEnUso, onListo, onAbrirChatCompleto,
+}: {
+  chat: ChatAlfred;
+  menuEnUso: string | null;
+  onListo: () => void;
+  onAbrirChatCompleto?: () => void;
+}) {
+  const alfred = chat;
+  const [texto, setTexto] = useState("");
+  const [enviado, setEnviado] = useState(false);
+
+  // Cuando el agente termina de responder, la tabla puede haber cambiado: se
+  // recarga sola. Sin esto había que apretar "actualizar" y nadie lo hacía, así
+  // que el cambio parecía no haber pasado.
+  useEffect(() => {
+    if (enviado && !alfred.busy) { setEnviado(false); onListo(); }
+  }, [enviado, alfred.busy, onListo]);
+
+  const mandar = (t: string) => {
+    const limpio = t.trim();
+    if (!limpio || alfred.busy) return;
+    const contexto = menuEnUso ? ` (estoy mirando el menú "${menuEnUso}")` : "";
+    void alfred.send(`[nutricion] ${limpio}${contexto}`);
+    setTexto("");
+    setEnviado(true);
+  };
+
+  const ultima = [...alfred.messages].reverse().find(m => m.role === "assistant");
+
+  return (
+    <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+      <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+        <MessageSquare className="h-4 w-4" /> Pedile un cambio
+      </h3>
+      <p className="mt-0.5 text-xs text-slate-500">
+        Sobre este mismo menú. Ojo: proponer no es guardar — pedile que lo guarde para que
+        quede en la tabla.
+      </p>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {["Cambiá la cena del martes", "Menos carbohidratos", "Sumá una colación", "Guardá esta versión"].map(s => (
+          <button
+            key={s}
+            onClick={() => mandar(s)}
+            disabled={alfred.busy}
+            className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] text-slate-600 hover:border-slate-400 hover:bg-slate-50 disabled:opacity-50"
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+
+      <form
+        onSubmit={(e) => { e.preventDefault(); mandar(texto); }}
+        className="mt-3 flex items-center gap-2"
+      >
+        <input
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          placeholder="Ej: el almuerzo del jueves que sea sin lácteos"
+          disabled={alfred.busy}
+          className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none disabled:bg-slate-50"
+        />
+        <button
+          type="submit"
+          disabled={alfred.busy || !texto.trim()}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[#0a1628] px-3 py-2 text-xs font-medium text-white hover:bg-[#16233a] disabled:opacity-50"
+        >
+          {alfred.busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+          Pedir
+        </button>
+      </form>
+
+      {alfred.busy && (
+        <p className="mt-2 text-[11px] text-slate-400">
+          El nutricionista está trabajando. Cuando termine, la tabla se actualiza sola.
+        </p>
+      )}
+
+      {/* La última respuesta, recortada. El hilo completo tiene su pestaña: repetirlo
+          entero acá sería una segunda ventana de chat compitiendo con la primera. */}
+      {!alfred.busy && ultima && (
+        <div className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-700">
+          <p className="line-clamp-4 whitespace-pre-wrap">{ultima.content}</p>
+          {onAbrirChatCompleto && (
+            <button
+              onClick={onAbrirChatCompleto}
+              className="mt-2 text-[11px] font-medium text-slate-500 underline underline-offset-2 hover:text-slate-800"
+            >
+              Ver la conversación completa
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
