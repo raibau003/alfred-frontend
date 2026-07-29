@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "./AuthProvider";
+import { mensajeInutil } from "./explicarError";
 import { Zap } from "lucide-react";
 
 export function LoginForm() {
@@ -89,8 +90,16 @@ export function LoginForm() {
             />
           </div>
 
+          {/* Última malla: si alguna vez llega algo que no es un texto usable,
+              se dice eso en vez de pintar "{}" —que fue exactamente lo que pasó
+              el 2026-07-28 y mandó a Javier a cambiar una contraseña que estaba
+              bien—. La traducción de verdad vive en explicarError.ts. */}
           {error && (
-            <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
+            <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
+              {mensajeInutil(error)
+                ? "No pude iniciar sesión y el servidor no explicó por qué. Suele ser que Alfred está caído, no tu contraseña."
+                : error}
+            </p>
           )}
 
           <button
