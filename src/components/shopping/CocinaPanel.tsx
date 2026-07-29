@@ -284,6 +284,34 @@ function VistaLista() {
 
   useEffect(() => { recargar(); }, [recargar]);
 
+  // Llegar desde el menú con `?buscar=1` arranca la búsqueda sola.
+  //
+  // Antes, "Buscar lista en supermercados" solo abría esta pestaña y dejaba la
+  // lista quieta: había que darse cuenta de que faltaba apretar "Buscar precios"
+  // acá adentro. Un botón que promete buscar y solo navega es un botón que
+  // miente, y el que lo aprieta se queda esperando algo que nunca arranca.
+  const [yaBusque, setYaBusque] = useState(false);
+  useEffect(() => {
+    if (yaBusque) return;
+    if (new URLSearchParams(window.location.search).get("buscar") !== "1") return;
+    setYaBusque(true);
+    (async () => {
+      setCargando(true);
+      // Primero se trae lo del menú: si el usuario vino directo, la lista puede
+      // estar vacía y buscar precios de nada no diría nada útil.
+      await listaDesdeMenu();
+      const r = await buscarPreciosLista(8);
+      setNota(r.mensaje ?? r.error ?? "Busqué los precios de tu lista.");
+      setCargando(false);
+      await recargar();
+      // Se saca el parámetro para que recargar la página no vuelva a disparar
+      // una búsqueda que cuesta minutos.
+      const u = new URL(window.location.href);
+      u.searchParams.delete("buscar");
+      window.history.replaceState({}, "", u);
+    })();
+  }, [yaBusque, recargar]);
+
   const calcular = async () => {
     setCargando(true);
     setPresu(await presupuestar(modo, modo === "techo" ? Number(techo) || undefined : undefined));
