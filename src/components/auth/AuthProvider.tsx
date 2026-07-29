@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { explicarErrorDeLogin } from "./explicarError";
 import type { User, Session } from "@supabase/supabase-js";
 
 interface AuthCtx {
@@ -48,12 +49,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return error?.message ?? null;
+    // No se devuelve `error.message` crudo: cuando el backend está caído,
+    // supabase-js no encuentra JSON del que sacar un mensaje y deja "{}", que es
+    // literalmente lo que se veía en la pantalla de login el 2026-07-28. Ver
+    // explicarError.ts.
+    return explicarErrorDeLogin(error);
   };
 
   const signUp = async (email: string, password: string, name: string, phone?: string) => {
     const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) return error.message;
+    if (error) return explicarErrorDeLogin(error);
     if (data.user) {
       await supabase.from("profiles").upsert({
         id: data.user.id,
