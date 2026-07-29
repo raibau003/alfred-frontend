@@ -846,7 +846,14 @@ export async function presupuestar(modo: "libre" | "techo" | "comparado", techo?
   }
 }
 
-export async function buscarPreciosLista(max = 8): Promise<{ mensaje?: string; pendientes?: string[]; error?: string }> {
+export async function buscarPreciosLista(max = 8): Promise<{
+  mensaje?: string;
+  pendientes?: string[];
+  /** Cuántos productos encontró en las tiendas en ESTA llamada. */
+  productos_encontrados?: number;
+  sin_resultado?: string[];
+  error?: string;
+}> {
   try {
     const url = await getRouterUrl();
     const r = await fetch(`${url}/lista/buscar-precios`, {
