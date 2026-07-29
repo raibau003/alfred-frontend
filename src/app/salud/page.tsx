@@ -92,7 +92,7 @@ export default function SaludPage() {
               </div>
               {vista === "entrenamiento"
                 ? <PlanEntrenamiento />
-                : <PlanAlimentacion onHablar={() => setTab("nutricion")} />}
+                : <PlanAlimentacion onHablar={() => setTab("nutricion")} chat={nutricionista} />}
             </>
           ) : (
             <HogarPanel />

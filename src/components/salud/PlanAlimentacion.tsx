@@ -28,7 +28,19 @@ import {
   type PlanAlimentacion as Plan, type FilaAlimentacion, type VersionMenu,
 } from "@/lib/alfred/client";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { useAlfred } from "@/hooks/useAlfred";
+import type { useAlfred } from "@/hooks/useAlfred";
+
+/**
+ * La conversación con el nutricionista, prestada desde la página.
+ *
+ * NO se llama a `useAlfred` acá adentro: la pestaña del nutricionista ya tiene
+ * su instancia, y una segunda con la misma `chatKey` crea una SEGUNDA sesión en
+ * el router sobre el mismo chat. Además de duplicar sesiones, dejaba las dos
+ * mitades desincronizadas: se pedía un cambio abajo, se abría "ver la
+ * conversación completa", y el mensaje recién mandado no estaba ahí porque esa
+ * otra sesión no lo había visto.
+ */
+type ChatAlfred = ReturnType<typeof useAlfred>;
 
 const NOMBRE_COMIDA: Record<string, string> = {
   desayuno: "Desayuno", snack_am: "Media mañana", almuerzo: "Almuerzo",
@@ -40,7 +52,7 @@ function esProblemaDeSesion(error: string) {
   return /401|sesi[oó]n/i.test(error);
 }
 
-export function PlanAlimentacion({ onHablar }: { onHablar?: () => void }) {
+export function PlanAlimentacion({ onHablar, chat }: { onHablar?: () => void; chat?: ChatAlfred }) {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [cargando, setCargando] = useState(true);
   const [eligiendo, setEligiendo] = useState<string | null>(null);
@@ -215,11 +227,14 @@ export function PlanAlimentacion({ onHablar }: { onHablar?: () => void }) {
           {/* Pedir un cambio no debería obligar a cambiar de pestaña y perder de vista
               la tabla que se quiere cambiar. El chat va acá abajo, con el menú a la
               vista, y al terminar el plan se recarga solo. */}
-          <ChatDelMenu
-            menuEnUso={p.alternativas.find(v => v.elegido)?.nombre ?? null}
-            onListo={() => void cargar(false)}
-            onAbrirChatCompleto={onHablar}
-          />
+          {chat && (
+            <ChatDelMenu
+              chat={chat}
+              menuEnUso={p.alternativas.find(v => v.elegido)?.nombre ?? null}
+              onListo={() => void cargar(false)}
+              onAbrirChatCompleto={onHablar}
+            />
+          )}
         </>
       )}
 
@@ -399,13 +414,14 @@ function ListaCompras({
 // que el nutricionista propone no queda en la tabla hasta que se confirma.
 // ─────────────────────────────────────────────────────────────────────────────
 function ChatDelMenu({
-  menuEnUso, onListo, onAbrirChatCompleto,
+  chat, menuEnUso, onListo, onAbrirChatCompleto,
 }: {
+  chat: ChatAlfred;
   menuEnUso: string | null;
   onListo: () => void;
   onAbrirChatCompleto?: () => void;
 }) {
-  const alfred = useAlfred(undefined, "salud-nutricion");
+  const alfred = chat;
   const [texto, setTexto] = useState("");
   const [enviado, setEnviado] = useState(false);
 
