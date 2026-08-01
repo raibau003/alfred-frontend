@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   Wallet, TrendingUp, AlertTriangle, RefreshCw, Loader2, Download, Repeat, CreditCard,
-  Layers, Landmark, ArrowDownRight, ArrowUpRight, PiggyBank, X, Search, Check, ChevronDown,
+  Layers, Landmark, ArrowDownRight, ArrowUpRight, PiggyBank, X, Search, Check, ChevronDown, Zap,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine, Cell, PieChart, Pie, Legend,
@@ -30,6 +30,11 @@ const rangoLabel = (sel: string[], total: number) => {
 };
 
 type Cat = { categoria: string; monto: number };
+type PatPacItem = {
+  comercio: string; modalidad: "PAT" | "PAC"; producto: string; banco: string;
+  categoria: string; monto: number; ultimoMes: string; mesesActivo: number;
+  cobros: number; total: number;
+};
 type Mov = { mes: string; fecha: string; comercio: string; monto: number; tipo: string; categoria: string; producto: string; banco: string; fuente?: string; titular?: string | null };
 type MesData = {
   santanderCC: { ingresos: number; egresos: number };
@@ -48,6 +53,13 @@ type Dash = {
   porMes: Record<string, MesData>;
   evolucion: { mes: string; ingresos: number; egresos: number; neto: number; tarjeta: number }[];
   suscripciones: { nombre: string; monto: number; categoria: string }[];
+  // Pagos automáticos (PAT = con tarjeta, PAC = de la cuenta). `vigentes` son los que se
+  // cobraron en el último mes con datos: el compromiso real del mes que viene. `items`
+  // trae también los dados de baja, que sirven para mirar y no para sumar.
+  patPac?: {
+    items: PatPacItem[]; vigentes: PatPacItem[]; ultimoMes: string;
+    totalMensual: number; totalPAT: number; totalPAC: number;
+  };
   totalSuscripciones: number;
   cuotas: { comercio: string; monto: number; cuota_actual: number; cuota_total: number; restantes: number; pendiente: number }[];
   totalCuotasPendiente: number;
@@ -58,7 +70,7 @@ type Dash = {
 };
 
 const PIE = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#64748b"];
-const TABS = ["Resumen", "Personas", "Tarjetas", "Cuentas", "Categorías", "Evolución", "Proyección"] as const;
+const TABS = ["Resumen", "Personas", "Tarjetas", "PAT / PAC", "Cuentas", "Categorías", "Evolución", "Proyección"] as const;
 type Tab = typeof TABS[number];
 
 // Estado del Atajo del celular. Los "golpes" son los intentos que llegaron al router desde el
@@ -300,6 +312,9 @@ export default function FinanzasPage() {
           <Card title={`Tarjeta · por categoría · ${rango}`}><CatBars cats={pm?.categoriasTarjeta ?? []} /></Card>
         </div>
       )}
+
+      {/* ─── PAT / PAC ─── */}
+      {tab === "PAT / PAC" && <PatPacTab data={d!.patPac} />}
 
       {/* ─── CUENTAS ─── */}
       {tab === "Cuentas" && pm && (
@@ -783,6 +798,104 @@ function Kpi({ icon, label, value, color, sub }: { icon: React.ReactNode; label:
     </div>
   );
 }
+// ── PAT / PAC ────────────────────────────────────────────────────────────────
+//
+// Lo que se cobra solo, todos los meses, sin que nadie apriete nada: PAT (con la
+// tarjeta) y PAC (desde la cuenta). Es la parte del gasto que nadie revisa,
+// justamente porque no exige ninguna acción.
+//
+// Dos decisiones de la pantalla:
+//
+//   • El número grande es el **compromiso del mes que viene**, no "cuánto llevás
+//     gastado". Suma solo los que siguen vivos —cobrados en el último mes con
+//     datos— y usa el ÚLTIMO monto de cada uno, no el promedio: si el seguro subió,
+//     lo que te van a cobrar es el precio nuevo.
+//   • Los dados de baja no desaparecen: van abajo, aparte y sin sumar. Borrarlos
+//     esconde justo lo que sirve para entender en qué se te fue la plata.
+function PatPacTab({ data }: { data?: Dash["patPac"] }) {
+  if (!data || !data.items.length) {
+    return <Card title="Pagos automáticos"><Empty text="No detecté cobros PAT ni PAC todavía. Aparecen cuando la cartola trae líneas con «P.A.T.», «PAC» o «pago automático»." /></Card>;
+  }
+  const { vigentes, items, totalMensual, totalPAT, totalPAC, ultimoMes } = data;
+  const dadosDeBaja = items.filter((i) => i.ultimoMes !== ultimoMes);
+  const mesLabel = (m: string) => {
+    const [y, mm] = (m || "").split("-");
+    return `${["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"][Number(mm) - 1] ?? mm} ${y ?? ""}`.trim();
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card title={`Se te va solo, cada mes · ${mesLabel(ultimoMes)}`}>
+        <p className="text-3xl font-bold text-slate-900">{clp(totalMensual)}</p>
+        <p className="mt-1 text-sm text-slate-500">
+          {vigentes.length} cobro{vigentes.length === 1 ? "" : "s"} automático{vigentes.length === 1 ? "" : "s"} vigente{vigentes.length === 1 ? "" : "s"} · al año son {clp(totalMensual * 12)}
+        </p>
+        <div className="mt-3 flex gap-2">
+          <span className="rounded-lg bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700">
+            <CreditCard className="mr-1.5 inline h-3.5 w-3.5" />PAT (tarjeta): <b>{clp(totalPAT)}</b>
+          </span>
+          <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm text-emerald-700">
+            <Landmark className="mr-1.5 inline h-3.5 w-3.5" />PAC (cuenta): <b>{clp(totalPAC)}</b>
+          </span>
+        </div>
+      </Card>
+
+      <Card title="Vigentes">
+        <PatPacTable items={vigentes} />
+      </Card>
+
+      {dadosDeBaja.length > 0 && (
+        <Card title={`Ya no se cobran · ${dadosDeBaja.length}`}>
+          <p className="mb-2 text-sm text-slate-500">Estuvieron activos y dejaron de aparecer. No suman al compromiso mensual.</p>
+          <PatPacTable items={dadosDeBaja} apagados />
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function PatPacTable({ items, apagados = false }: { items: PatPacItem[]; apagados?: boolean }) {
+  const mesLabelCorto = (m: string) => (m || "").split("-").reverse().join("/");
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+            <th className="py-2 pr-3 font-medium">Comercio</th>
+            <th className="py-2 pr-3 font-medium">Tipo</th>
+            <th className="py-2 pr-3 font-medium">Hace</th>
+            <th className="py-2 pr-3 text-right font-medium">{apagados ? "Último" : "Mensual"}</th>
+            <th className="py-2 text-right font-medium">{apagados ? "Dejó de cobrarse" : "Al año"}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((i, n) => (
+            <tr key={n} className={`border-b border-slate-100 last:border-0 ${apagados ? "text-slate-400" : ""}`}>
+              <td className="py-2 pr-3">
+                <span className="truncate">
+                  <Zap className={`mr-1.5 inline h-3.5 w-3.5 ${apagados ? "text-slate-300" : "text-amber-500"}`} />
+                  {i.comercio}
+                </span>
+                {i.categoria && <span className="ml-1 text-xs text-slate-400">· {i.categoria}</span>}
+              </td>
+              <td className="py-2 pr-3">
+                <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${i.modalidad === "PAT" ? "bg-indigo-100 text-indigo-700" : "bg-emerald-100 text-emerald-700"}`}>
+                  {i.modalidad}
+                </span>
+              </td>
+              {/* Hace cuántos meses viene cobrándose. Un cobro que apareció UNA vez no es
+                  un compromiso mensual, y sin este dato los dos se ven iguales. */}
+              <td className="py-2 pr-3 text-slate-500">{i.mesesActivo} {i.mesesActivo === 1 ? "mes" : "meses"}</td>
+              <td className="py-2 pr-3 text-right font-medium">{clp(i.monto)}</td>
+              <td className="py-2 text-right text-slate-500">{apagados ? mesLabelCorto(i.ultimoMes) : clp(i.monto * 12)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return <div className="rounded-2xl border border-slate-200 bg-white p-5"><h2 className="mb-3 text-sm font-semibold text-slate-700">{title}</h2>{children}</div>;
 }
