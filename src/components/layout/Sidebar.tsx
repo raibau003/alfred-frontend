@@ -21,7 +21,8 @@ import {
   HeartPulse,
   GraduationCap,
   Zap,
-  LineChart} from "lucide-react";
+  LineChart,
+  TrendingUp} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ROUTER_URL } from "@/lib/alfred/client";
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/recordatorios", label: "Recordatorios", icon: Bell },
   { href: "/misiones", label: "Misiones", icon: Target },
   { href: "/finanzas", label: "Finanzas", icon: Wallet },
+  { href: "/forecast", label: "Forecast", icon: TrendingUp },
   { href: "/salud", label: "Salud", icon: HeartPulse },
   { href: "/educacion", label: "Educación", icon: GraduationCap },
   // Seguimiento va pegado a Educación: es la misma pregunta —cómo va cada uno— pero
